@@ -1,50 +1,166 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+  SYNC IMPACT REPORT
+  ==================
+  Version change: [placeholder] → 1.0.0
+
+  Added sections:
+  - Core Principles (5 принципов: I–V)
+  - Технический Стек
+  - Структура Исходного Кода
+  - Governance
+
+  Modified principles: N/A (первичная версия)
+  Removed sections: N/A (первичная версия)
+
+  Templates consistency check:
+  - .specify/templates/plan-template.md  ✅ aligned (Constitution Check + web-app path conventions совместимы)
+  - .specify/templates/spec-template.md  ✅ aligned (generic, изменения не требуются)
+  - .specify/templates/tasks-template.md ✅ aligned (backend_monolith/src/, frontend/src/ совпадают со структурой)
+  - .specify/templates/checklist-template.md  ✅ aligned (generic, изменения не требуются)
+  - .specify/templates/agent-file-template.md ✅ aligned (generic, изменения не требуются)
+-->
+
+# Constitution проекта "Заметки"
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Монорепозиторий с Изолированными Сервисами
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+Проект организован как монорепозиторий, содержащий два независимых сервиса:
+- `backend_monolith/` — Symfony REST API (серверная часть)
+- `frontend/` — Vue 3 SPA (клиентская часть)
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+Каждый сервис MUST быть независимо развёртываемым. Взаимодействие между сервисами
+MUST осуществляться исключительно через HTTP API-контракты. Смешивание кода сервисов
+(например, прямые импорты через границу сервисов) ЗАПРЕЩЕНО.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+**Обоснование**: Чёткое разделение сервисов позволяет независимо масштабировать,
+тестировать и деплоить каждую часть системы.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### II. Тонкие Action-Контроллеры
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+Каждый HTTP-контроллер MUST быть отдельным классом с единственным методом `__invoke()`,
+MUST NOT наследоваться от AbstractController, а иметь атрибут AsController.
+Контроллер MUST валидировать HTTP-запрос через Request DTO + Symfony Validator, 
+вызвать ровно один сервис и вернуть результат (если это API, то в json).
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+Бизнес-логика в контроллерах ЗАПРЕЩЕНА. HTTP-объекты (`Request`, `Response`)
+MUST NOT выходить за пределы слоя `Presentation`.
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+**Обоснование**: Тонкие контроллеры упрощают тестирование, снижают связность и
+обеспечивают единственную точку изменения при изменении HTTP-интерфейса.
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+### III. Сервисы как Единственное Место Бизнес-Логики
+
+Вся бизнес-логика MUST находиться в `src/Application/Service/`. Сервисы:
+- MUST зависеть только от интерфейсов репозиториев (не от конкретных классов Doctrine).
+- MUST NOT иметь знания о HTTP, `Request` или `Response`.
+- MUST принимать зависимости через constructor injection (для лёгкого мокирования в тестах).
+- MUST быть покрыты unit-тестами с замоканными репозиториями.
+
+**Обоснование**: Изоляция бизнес-логики обеспечивает тестируемость без HTTP-контекста
+и позволяет переиспользовать логику из разных точек входа (HTTP, CLI и др.).
+
+### IV. Repository Pattern через Domain Interfaces
+
+Для каждой сущности MUST существовать:
+- Интерфейс в `src/Domain/Repository/` (без какой-либо реализации).
+- Реализация в `src/Infrastructure/Persistence/Repository/` на основе Doctrine ORM.
+
+Сервисы MUST зависеть исключительно от интерфейса. Прямое использование конкретных
+классов Doctrine (`EntityManager`, конкретных репозиториев) вне слоя `Infrastructure`
+ЗАПРЕЩЕНО.
+
+**Обоснование**: Паттерн позволяет заменять реализацию хранилища без изменения
+бизнес-логики и мокировать репозитории в unit-тестах.
+
+### V. DTO-ориентированный Обмен Данными
+
+Данные MUST передаваться через DTO на обоих направлениях:
+- **Входящие данные**: HTTP Request → Request DTO (`src/Application/DTO/Request/`)
+  с валидацией через Symfony Validator до передачи в сервис.
+- **Исходящие данные**: результат сервиса → Response DTO (`src/Application/DTO/Response/`)
+  и/или Symfony Serializer перед формированием `JsonResponse`.
+
+Прямое чтение сырых данных из `Request` внутри сервисов ЗАПРЕЩЕНО.
+
+**Обоснование**: DTO гарантируют явный контракт данных, упрощают документацию API
+и обеспечивают валидацию до попадания данных в бизнес-логику.
+
+## Технический Стек
+
+Следующий стек является обязательным. Замена любого компонента MUST быть обоснована
+и закреплена через поправку к конституции (с версионированием).
+
+| Компонент        | Технология                 |
+|------------------|----------------------------|
+| Backend monolith | Symfony 8 (PHP 8.4)        |
+| Frontend         | Vue 3 + Vue Router + Pinia |
+| База данных      | PostgreSQL 18+             |
+| Инфраструктура   | Docker Compose             |
+| CI               | GitHub Actions             |
+
+**CI MUST запускать**:
+- PHP CS-Fixer (статическая проверка стиля кода PHP)
+- PHPUnit (unit и integration тесты)
+
+**UX**: Интерфейс MUST поддерживать mobile-first, responsive-дизайн на всех устройствах.
+
+**Frontend-правила** (NON-NEGOTIABLE):
+- Состояние MUST управляться исключительно через Pinia store, не в компонентах напрямую.
+- Один компонент = одна ответственность.
+- API-вызовы MUST осуществляться только через composables, не из компонентов напрямую.
+
+## Структура Исходного Кода
+
+Следующая структура директорий является обязательной и отражает слоистую архитектуру.
+Отклонения MUST быть задокументированы в таблице `Complexity Tracking` плана фичи.
+
+```text
+backend_monolith/
+└── src/
+    ├── Domain/                   # Бизнес-ядро (независимо от фреймворка)
+    │   ├── Entity/               # Doctrine entities с бизнес-правилами
+    │   ├── Repository/           # Только интерфейсы репозиториев (без реализаций)
+    │   └── Trait/                # Общие трейты сущностей (например, Timestamps)
+    ├── Application/              # Сервисы и сценарии использования
+    │   ├── Service/              # Бизнес-логика (оркестрация use cases)
+    │   └── DTO/
+    │       ├── Request/          # Request DTO (валидируются через Symfony Validator)
+    │       └── Response/         # Response DTO (сериализуются в JsonResponse)
+    ├── Infrastructure/           # Реализации, зависящие от фреймворка
+    │   └── Persistence/
+    │       └── Repository/       # Реализации репозиториев на Doctrine ORM
+    └── Presentation/             # Точки входа
+        └── HTTP/                 # Action-контроллеры (один класс = __invoke())
+
+frontend/
+└── src/
+    ├── components/               # Переиспользуемые UI-компоненты (1 = 1 ответственность)
+    ├── pages/                    # Страницы (роуты Vue Router)
+    ├── stores/                   # Pinia stores (единственное место состояния)
+    ├── composables/              # API-вызовы и переиспользуемая логика
+    └── router/                   # Конфигурация Vue Router
+```
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+Данная конституция имеет приоритет над всеми другими практиками, соглашениями
+и техническими предпочтениями команды.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Процедура внесения поправок**:
+1. Поправка MUST быть задокументирована в `.specify/memory/constitution.md`.
+2. Версия MUST быть увеличена по следующим правилам семантического версионирования:
+    - **MAJOR**: удаление принципа или его несовместимое переопределение.
+    - **MINOR**: добавление нового принципа или раздела.
+    - **PATCH**: уточнения формулировок, исправление опечаток, некритичные правки.
+3. `Last Amended` MUST обновляться до текущей даты при каждой поправке.
+4. Все шаблоны в `.specify/templates/` MUST быть проверены на совместимость после правки.
+
+**Соответствие**:
+- Каждый план фичи (`plan.md`) MUST содержать секцию `Constitution Check` с явной
+  проверкой соответствия всем пяти принципам до начала реализации.
+- Нарушение принципа MUST быть обосновано в таблице `Complexity Tracking` плана.
+- Код, нарушающий принципы без обоснования, MUST быть отклонён на code review.
+
+**Version**: 1.0.0 | **Ratified**: 2026-02-26 | **Last Amended**: 2026-02-26
