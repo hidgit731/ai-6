@@ -1,0 +1,30 @@
+// ============================================================
+// Mobile-first Breakpoints
+// Usage: @include respond-to('md') { ... }
+// ============================================================
+@use 'sass:map';
+
+$breakpoints: (
+  'sm':  576px,   // Смартфоны landscape
+  'md':  768px,   // Планшеты
+  'lg':  1024px,  // Ноутбуки
+  'xl':  1280px,  // Десктопы
+  'xxl': 1536px,  // Широкие экраны
+);
+
+/// Генерирует media query min-width для указанного breakpoint
+/// @param {String} $name — ключ из $breakpoints
+/// @example
+///   .element {
+///     padding: 1rem;           // mobile (< 576px)
+///     @include respond-to('md') { padding: 2rem; } // >= 768px
+///   }
+@mixin respond-to($name) {
+  @if map.has-key($breakpoints, $name) {
+    @media (min-width: map.get($breakpoints, $name)) {
+      @content;
+    }
+  } @else {
+    @warn "Breakpoint `#{$name}` not found. Available: #{map.keys($breakpoints)}";
+  }
+}

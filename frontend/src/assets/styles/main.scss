@@ -1,0 +1,33 @@
+// ============================================================
+// Global Styles Entry Point
+// ============================================================
+@use './reset';
+@use './variables';
+@use './breakpoints';
+
+// --- Base ---
+html,
+body {
+  height: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-md);
+  background-color: var(--color-background);
+  color: var(--color-text);
+}
+
+#app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+// --- Responsive helpers ---
+img,
+video {
+  max-width: 100%;
+  height: auto;
+}

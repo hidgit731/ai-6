@@ -10,27 +10,40 @@ Auto-generated from all feature plans. Last updated: 2026-03-01
 
 ## Active Technologies
 
-- PHP 8.4 + Symfony 8.* (skeleton), symfony/validator, symfony/serializer, friendsofphp/php-cs-fixer ^3.0, phpunit/phpunit ^11.0 (001-backend-infra-init)
+- PHP 8.4 + Symfony 8.* (skeleton), symfony/validator, symfony/serializer, friendsofphp/php-cs-fixer ^3.0, phpunit/phpunit ^13.0 (001-backend-infra-init)
+- TypeScript 5.9 / Node.js 20+ LTS + Vue 3.5, Vite 7.3, Vue Router 5.0, Pinia 3.0, Sass 1.97 (002-frontend-init)
 
 ## Project Structure
 
 ```text
-backend/
+backend_monolith/
 frontend/
-tests/
 ```
 
 ## Commands
+```
+# Backend (backend_monolith/)
+# cd backend_monolith && composer install        — установка зависимостей
+# cd backend_monolith && php bin/console         — Symfony CLI
+# cd backend_monolith && php vendor/bin/phpunit  — запуск тестов
+# cd backend_monolith && php vendor/bin/php-cs-fixer fix  — форматирование кода
 
-# Add commands for PHP 8.4
+# Frontend (frontend/)
+# cd frontend && npm run dev        — dev server
+# cd frontend && npm run build      — production build
+# cd frontend && npm run type-check — TypeScript check
+# cd frontend && npm test           — unit tests
+```
 
 ## Code Style
 
 PHP 8.4: Follow standard conventions
+TypeScript 5.9 / Node.js 20+: Follow standard conventions; strict mode; `<script setup lang="ts">`
 
 ## Recent Changes
 
-- 001-backend-infra-init: Added PHP 8.4 + Symfony 8.* (skeleton), symfony/validator, symfony/serializer, friendsofphp/php-cs-fixer ^3.0, phpunit/phpunit ^11.0
+- 001-backend-infra-init: Added PHP 8.4 + Symfony 8.* (skeleton), symfony/validator, symfony/serializer, friendsofphp/php-cs-fixer ^3.0, phpunit/phpunit ^13.0
+- 002-frontend-init: Added TypeScript 5.9 / Node.js 20+ LTS + Vue 3.5, Vite 7.3, Vue Router 5.0, Pinia 3.0, Sass 1.97
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->

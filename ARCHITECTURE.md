@@ -6,15 +6,18 @@
 
 ## Технический стек
 
-| Компонент        | Технология                          |
-|------------------|-------------------------------------|
-| Backend monolith | PHP 8.4 + Symfony 8                 |
-| Frontend         | Vue 3 + Vue Router + Pinia          |
-| База данных      | PostgreSQL 18+                      |
-| Инфраструктура   | Docker Compose                      |
-| CI               | GitHub Actions                      |
-| Стиль кода PHP   | PHP CS-Fixer (`@Symfony`, `@Symfony:risky`) |
-| Тесты PHP        | PHPUnit 11+                         |
+| Компонент        | Технология                                    |
+|------------------|-----------------------------------------------|
+| Backend monolith | PHP 8.4 + Symfony 8                           |
+| Frontend         | Vue 3.5 + Vue Router 5.0 + Pinia 3.0          |
+| Сборка Frontend  | Vite 7.3 + TypeScript 5.9                     |
+| Стили Frontend   | Sass 1.97 (SCSS)                              |
+| Тесты Frontend   | Vitest 4.0                                    |
+| База данных      | PostgreSQL 18+                                |
+| Инфраструктура   | Docker Compose                                |
+| CI               | GitHub Actions                                |
+| Стиль кода PHP   | PHP CS-Fixer (`@Symfony`, `@Symfony:risky`)   |
+| Тесты PHP        | PHPUnit 13+                                   |
 
 ## Структура репозитория
 
@@ -105,11 +108,17 @@ Frontend — Single Page Application на Vue 3. Взаимодействует 
 
 ```
 src/
+├── assets/
+│   └── styles/         # Глобальные SCSS-стили
+│       ├── _breakpoints.scss   # Брейкпоинты для responsive-дизайна
+│       ├── _reset.scss         # CSS-reset
+│       ├── _variables.scss     # CSS/SCSS переменные
+│       └── main.scss           # Точка входа стилей
 ├── components/     # Переиспользуемые UI-компоненты (1 компонент = 1 ответственность)
-├── pages/          # Страницы (привязаны к роутам Vue Router)
-├── stores/         # Pinia stores (единственное место управления состоянием)
 ├── composables/    # API-вызовы и переиспользуемая логика
-└── router/         # Конфигурация Vue Router
+├── pages/          # Страницы (привязаны к роутам Vue Router)
+├── router/         # Конфигурация Vue Router
+└── stores/         # Pinia stores (единственное место управления состоянием)
 ```
 
 ### Ключевые правила
@@ -146,3 +155,50 @@ GitHub Actions запускает при каждом Pull Request:
 2. **KISS** — решения должны быть простыми и понятными без избыточной абстракции.
 3. **Testability** — бизнес-логика изолирована и покрывается unit-тестами без запуска HTTP-стека или БД.
 4. **Explicit contracts** — все данные на границах слоёв передаются через DTO с явными типами.
+
+---
+
+## Changelog
+
+### [002] Frontend Initialized — 2026-03-01
+
+Инициализирован фронтенд-сервис (`frontend/`) на базе Vue 3 + Vite.
+
+**Добавлено:**
+
+- Scaffold Vue 3.5 SPA: `main.ts`, `App.vue`, `index.html`
+- **Vue Router 5.0** — конфигурация в `src/router/index.ts`; маршруты: `/` (`HomePage`), `*` (`NotFoundPage`)
+- **Pinia 3.0** — пример store в `src/stores/example.ts`
+- **Composables** — пример API-вызовов в `src/composables/useExample.ts`
+- **Компоненты** — `AppLayout.vue` (корневой layout с шапкой и подвалом)
+- **SCSS-система стилей** (`src/assets/styles/`):
+  - `_reset.scss` — CSS-reset
+  - `_variables.scss` — дизайн-токены (цвета, типографика, отступы)
+  - `_breakpoints.scss` — брейкпоинты для mobile-first адаптивности
+  - `main.scss` — точка подключения всех стилей
+- **TypeScript** — `tsconfig.json`, `tsconfig.app.json`, `tsconfig.node.json` (strict mode)
+- **Vite 7.3** — `vite.config.ts` с плагином `@vitejs/plugin-vue`
+- **Vitest 4.0** — подключён для unit-тестирования компонентов
+- `frontend/.env.example` — переменные `VITE_API_BASE_URL`, `VITE_PORT`
+- `frontend/.gitignore`
+
+**Технические решения:**
+
+- Сборщик Vite выбран вместо Webpack — быстрый HMR, нативный ESM в dev-режиме
+- Sass (SCSS) вместо CSS Modules — удобнее для глобальных переменных и брейкпоинтов
+- Vitest вместо Jest — нулевая настройка в связке с Vite, единый конфиг
+
+---
+
+### [001] Backend Initialized — до 2026-03-01
+
+Инициализирован бэкенд-сервис (`backend_monolith/`) на базе Symfony 8.
+
+**Добавлено:**
+
+- Symfony 8 skeleton с PHP 8.4
+- `symfony/validator`, `symfony/serializer` — валидация и сериализация DTO
+- `friendsofphp/php-cs-fixer ^3.0` — линтер PHP (профили `@Symfony`, `@Symfony:risky`)
+- `phpunit/phpunit ^13.0` — фреймворк тестирования
+- Слоистая архитектура `src/`: `Domain`, `Application`, `Infrastructure`, `Presentation`
+- Docker-окружение: `backend_monolith/deploy/dev/`, `backend_monolith/deploy/prod/`
