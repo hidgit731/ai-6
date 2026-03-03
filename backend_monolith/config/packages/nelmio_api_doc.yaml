@@ -1,0 +1,10 @@
+nelmio_api_doc:
+    documentation:
+        info:
+            title: 'Заметки API'
+            description: 'CRUD API для заметок с Markdown-контентом'
+            version: '1.0.0'
+    areas:
+        default:
+            path_patterns:
+                - ^/api/

@@ -1,0 +1,197 @@
+<script setup lang="ts">
+import { onMounted, watch, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import NoteCard from '@/components/NoteCard.vue'
+import Pagination from '@/components/Pagination.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import { useNotesStore } from '@/stores/notes'
+
+const route = useRoute()
+const router = useRouter()
+const notesStore = useNotesStore()
+
+const deleteTarget = ref<string | null>(null)
+
+function currentPage(): number {
+    const p = Number(route.query.page)
+    return p > 0 ? p : 1
+}
+
+async function loadPage(page: number): Promise<void> {
+    await notesStore.fetchList(page)
+}
+
+onMounted(() => loadPage(currentPage()))
+
+watch(() => route.query.page, () => loadPage(currentPage()))
+
+function handlePageChange(page: number): void {
+    router.push({ name: 'notes-list', query: { page } })
+}
+
+async function confirmDelete(): Promise<void> {
+    if (!deleteTarget.value) return
+    const id = deleteTarget.value
+    deleteTarget.value = null
+    await notesStore.deleteNote(id)
+
+    const pg = currentPage()
+    const remaining = notesStore.notes.filter(n => n.id !== id).length
+    const newPage = remaining === 0 && pg > 1 ? pg - 1 : pg
+    await loadPage(newPage)
+    if (newPage !== pg) {
+        router.replace({ name: 'notes-list', query: newPage > 1 ? { page: newPage } : {} })
+    }
+}
+</script>
+
+<template>
+    <div class="notes-list-page">
+        <div class="page-header">
+            <h1 class="page-title">Заметки</h1>
+            <button class="btn-create" @click="router.push({ name: 'note-create' })">
+                + Новая заметка
+            </button>
+        </div>
+
+        <div v-if="notesStore.loading" class="loading">Загрузка...</div>
+
+        <div v-else-if="notesStore.error" class="error-message">
+            {{ notesStore.error }}
+        </div>
+
+        <template v-else>
+            <div v-if="notesStore.notes.length === 0" class="empty-state">
+                <p>Заметок пока нет.</p>
+                <button class="btn-create" @click="router.push({ name: 'note-create' })">
+                    Создать первую заметку
+                </button>
+            </div>
+
+            <div v-else class="notes-grid">
+                <div v-for="note in notesStore.notes" :key="note.id" class="note-row">
+                    <NoteCard :note="note" class="note-card-grow" />
+                    <button
+                        class="btn-delete-note"
+                        title="Удалить заметку"
+                        @click.stop="deleteTarget = note.id"
+                    >
+                        ✕
+                    </button>
+                </div>
+            </div>
+
+            <Pagination
+                :page="notesStore.pagination.page"
+                :total-pages="notesStore.pagination.totalPages"
+                @page-change="handlePageChange"
+            />
+        </template>
+
+        <ConfirmDialog
+            v-if="deleteTarget"
+            title="Удалить заметку?"
+            message="Это действие необратимо. Заметка будет удалена навсегда."
+            confirm-label="Удалить"
+            @confirm="confirmDelete"
+            @cancel="deleteTarget = null"
+        />
+    </div>
+</template>
+
+<style scoped>
+.notes-list-page {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 1.5rem 1rem;
+}
+
+.page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.page-title {
+    font-size: 1.75rem;
+    margin: 0;
+    color: #222;
+}
+
+.btn-create {
+    background: #4a90d9;
+    color: white;
+    border: none;
+    padding: 0.55rem 1.2rem;
+    border-radius: 4px;
+    font-size: 0.95rem;
+    cursor: pointer;
+}
+
+.btn-create:hover {
+    background: #357abd;
+}
+
+.loading {
+    text-align: center;
+    color: #888;
+    padding: 2rem;
+}
+
+.error-message {
+    background: #fee;
+    color: #c33;
+    border: 1px solid #fcc;
+    padding: 0.75rem;
+    border-radius: 4px;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #888;
+}
+
+.empty-state p {
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+}
+
+.notes-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.note-row {
+    display: flex;
+    align-items: stretch;
+    gap: 0.5rem;
+}
+
+.note-card-grow {
+    flex: 1;
+}
+
+.btn-delete-note {
+    background: none;
+    border: 1px solid #ddd;
+    color: #999;
+    border-radius: 4px;
+    padding: 0.4rem 0.6rem;
+    cursor: pointer;
+    align-self: center;
+    line-height: 1;
+    font-size: 0.85rem;
+    transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+
+.btn-delete-note:hover {
+    background: #fee;
+    color: #c33;
+    border-color: #fcc;
+}
+</style>
