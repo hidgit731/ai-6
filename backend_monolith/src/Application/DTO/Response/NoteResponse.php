@@ -12,6 +12,8 @@ class NoteResponse
         public readonly ?string $content,
         public readonly string $createdAt,
         public readonly string $updatedAt,
+        public readonly ?string $folderId = null,
+        public readonly ?string $folderName = null,
     ) {
     }
 }

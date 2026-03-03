@@ -6,11 +6,13 @@ namespace App\Application\Service;
 
 use App\Application\DTO\Request\CreateNoteRequest;
 use App\Application\DTO\Request\ListNotesRequest;
+use App\Application\DTO\Request\MoveNoteToFolderRequest;
 use App\Application\DTO\Request\UpdateNoteRequest;
 use App\Application\DTO\Response\NoteListItemResponse;
 use App\Application\DTO\Response\NoteResponse;
 use App\Application\DTO\Response\PaginatedNotesResponse;
 use App\Domain\Entity\Note;
+use App\Domain\Repository\FolderRepositoryInterface;
 use App\Domain\Repository\NoteRepositoryInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Uid\Uuid;
@@ -19,19 +21,30 @@ class NoteService
 {
     private const PER_PAGE = 10;
 
-    public function __construct(private readonly NoteRepositoryInterface $noteRepository)
-    {
+    public function __construct(
+        private readonly NoteRepositoryInterface $noteRepository,
+        private readonly FolderRepositoryInterface $folderRepository,
+    ) {
     }
 
     public function create(CreateNoteRequest $request): NoteResponse
     {
         $note = new Note($request->title, $request->content);
+
+        if (null !== $request->folderId) {
+            $folder = $this->folderRepository->findById($request->folderId);
+            if (null === $folder) {
+                throw new NotFoundHttpException('Папка не найдена.');
+            }
+            $note->setFolder($folder);
+        }
+
         $this->noteRepository->save($note);
 
         return $this->toResponse($note);
     }
 
-    public function update(Uuid $id, UpdateNoteRequest $request): NoteResponse
+    public function update(Uuid $id, UpdateNoteRequest $request, bool $changeFolderId = false): NoteResponse
     {
         $note = $this->noteRepository->findById($id);
 
@@ -41,6 +54,19 @@ class NoteService
 
         $note->setTitle($request->title);
         $note->setContent($request->content);
+
+        if ($changeFolderId) {
+            if (null === $request->folderId) {
+                $note->setFolder(null);
+            } else {
+                $folder = $this->folderRepository->findById($request->folderId);
+                if (null === $folder) {
+                    throw new NotFoundHttpException('Папка не найдена.');
+                }
+                $note->setFolder($folder);
+            }
+        }
+
         $this->noteRepository->save($note);
 
         return $this->toResponse($note);
@@ -70,7 +96,9 @@ class NoteService
 
     public function list(ListNotesRequest $request): PaginatedNotesResponse
     {
-        $result = $this->noteRepository->findPaginated($request->page, self::PER_PAGE);
+        $result = null !== $request->folderId
+            ? $this->noteRepository->findByFolderIdPaginated($request->folderId, $request->page, self::PER_PAGE)
+            : $this->noteRepository->findPaginated($request->page, self::PER_PAGE);
 
         $items = array_map(
             fn (Note $note) => $this->toListItemResponse($note),
@@ -88,6 +116,28 @@ class NoteService
         );
     }
 
+    public function moveNoteToFolder(Uuid $id, MoveNoteToFolderRequest $request): NoteResponse
+    {
+        $note = $this->noteRepository->findById($id);
+        if (null === $note) {
+            throw new NotFoundHttpException('Заметка не найдена.');
+        }
+
+        if (null === $request->folderId) {
+            $note->setFolder(null);
+        } else {
+            $folder = $this->folderRepository->findById($request->folderId);
+            if (null === $folder) {
+                throw new NotFoundHttpException('Папка не найдена.');
+            }
+            $note->setFolder($folder);
+        }
+
+        $this->noteRepository->save($note);
+
+        return $this->toResponse($note);
+    }
+
     private function toResponse(Note $note): NoteResponse
     {
         return new NoteResponse(
@@ -96,6 +146,8 @@ class NoteService
             content: $note->getContent(),
             createdAt: $note->getCreatedAt()->format(\DateTimeInterface::ATOM),
             updatedAt: $note->getUpdatedAt()->format(\DateTimeInterface::ATOM),
+            folderId: $note->getFolderId(),
+            folderName: $note->getFolder()?->getName(),
         );
     }
 
@@ -106,6 +158,7 @@ class NoteService
             title: $note->getTitle(),
             preview: $this->generatePreview($note->getContent()),
             createdAt: $note->getCreatedAt()->format(\DateTimeInterface::ATOM),
+            folderId: $note->getFolderId(),
         );
     }
 

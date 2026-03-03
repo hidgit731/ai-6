@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { RouterView } from 'vue-router'
-// AppLayout — базовый layout-компонент.
-// Единственная ответственность: структурная обёртка (header + main + footer).
-// Никакой бизнес-логики. Mobile-first responsive через SCSS.
+import FolderTree from './FolderTree.vue'
+import ToastContainer from './ToastContainer.vue'
 </script>
 
 <template>
@@ -13,17 +12,25 @@ import { RouterView } from 'vue-router'
       </div>
     </header>
 
-    <main class="app-layout__main">
-      <div class="app-layout__content">
-        <RouterView />
-      </div>
-    </main>
+    <div class="app-layout__body">
+      <aside class="app-layout__sidebar">
+        <FolderTree />
+      </aside>
+
+      <main class="app-layout__main">
+        <div class="app-layout__content">
+          <RouterView />
+        </div>
+      </main>
+    </div>
 
     <footer class="app-layout__footer">
       <div class="app-layout__footer-inner">
         <span>© 2026 Заметки</span>
       </div>
     </footer>
+
+    <ToastContainer />
   </div>
 </template>
 
@@ -35,9 +42,6 @@ import { RouterView } from 'vue-router'
   flex-direction: column;
   min-height: 100vh;
 
-  // -------------------------------------------------------
-  // Header
-  // -------------------------------------------------------
   &__header {
     height: var(--header-height);
     background-color: var(--color-surface);
@@ -62,29 +66,34 @@ import { RouterView } from 'vue-router'
     color: var(--color-primary);
   }
 
-  // -------------------------------------------------------
-  // Main content — flex: 1 растягивает до конца viewport
-  // -------------------------------------------------------
+  &__body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  &__sidebar {
+    flex-shrink: 0;
+    overflow-y: auto;
+  }
+
   &__main {
     flex: 1;
-    width: 100%;
+    overflow: auto;
+    min-width: 0;
   }
 
   &__content {
     max-width: var(--content-max-width);
     margin: 0 auto;
     padding: var(--spacing-lg) var(--content-padding-x);
-    min-width: 0; // предотвращает переполнение flex-children
+    min-width: 0;
 
-    // Desktops: увеличиваем отступы
     @include respond-to('lg') {
       padding: var(--spacing-2xl) var(--spacing-xl);
     }
   }
 
-  // -------------------------------------------------------
-  // Footer
-  // -------------------------------------------------------
   &__footer {
     height: var(--footer-height);
     background-color: var(--color-surface);

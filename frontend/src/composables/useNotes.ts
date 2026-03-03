@@ -3,6 +3,7 @@ export interface NoteListItem {
     title: string
     preview: string | null
     createdAt: string
+    folderId: string | null
 }
 
 export interface Note {
@@ -11,6 +12,8 @@ export interface Note {
     content: string | null
     createdAt: string
     updatedAt: string
+    folderId: string | null
+    folderName: string | null
 }
 
 export interface PaginatedNotes {
@@ -24,18 +27,24 @@ export interface PaginatedNotes {
 export interface CreateNotePayload {
     title: string
     content: string | null
+    folderId?: string | null
 }
 
 export interface UpdateNotePayload {
     title: string
     content: string | null
+    folderId?: string | null
 }
 
 const API_BASE = import.meta.env.VITE_API_URL ?? '/api'
 
 export function useNotes() {
-    async function list(page = 1): Promise<PaginatedNotes> {
-        const res = await fetch(`${API_BASE}/notes?page=${page}`)
+    async function list(page = 1, folderId?: string | null): Promise<PaginatedNotes> {
+        let url = `${API_BASE}/notes?page=${page}`
+        if (folderId !== undefined) {
+            url += `&folderId=${folderId ?? ''}`
+        }
+        const res = await fetch(url)
         if (!res.ok) throw new Error('Ошибка загрузки заметок')
         return res.json()
     }
@@ -82,5 +91,16 @@ export function useNotes() {
         if (!res.ok) throw new Error('Ошибка удаления заметки')
     }
 
-    return { list, getById, create, update, remove }
+    async function moveNoteToFolder(noteId: string, folderId: string | null): Promise<Note> {
+        const res = await fetch(`${API_BASE}/notes/${noteId}/folder`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folderId }),
+        })
+        if (res.status === 404) throw new Error('Заметка или папка не найдена.')
+        if (!res.ok) throw new Error('Ошибка перемещения заметки')
+        return res.json()
+    }
+
+    return { list, getById, create, update, remove, moveNoteToFolder }
 }

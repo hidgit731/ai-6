@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useNotes } from '@/composables/useNotes'
+import { useFoldersStore } from '@/stores/folders'
 import type { Note, NoteListItem, PaginatedNotes, CreateNotePayload, UpdateNotePayload } from '@/composables/useNotes'
 
 export const useNotesStore = defineStore('notes', () => {
@@ -17,11 +18,19 @@ export const useNotesStore = defineStore('notes', () => {
     const loading = ref(false)
     const error = ref<string | null>(null)
 
+    const foldersStore = useFoldersStore()
+
+    watch(
+        () => foldersStore.selectedFolderId,
+        () => fetchList(1)
+    )
+
     async function fetchList(page = 1): Promise<void> {
         loading.value = true
         error.value = null
         try {
-            const data = await notesApi.list(page)
+            const folderId = foldersStore.selectedFolderId
+            const data = await notesApi.list(page, folderId !== null ? folderId : undefined)
             notes.value = data.items
             pagination.value = {
                 page: data.page,
@@ -84,6 +93,17 @@ export const useNotesStore = defineStore('notes', () => {
         }
     }
 
+    async function moveNote(noteId: string, folderId: string | null): Promise<void> {
+        const note = await notesApi.moveNoteToFolder(noteId, folderId)
+        const idx = notes.value.findIndex((n) => n.id === noteId)
+        if (idx !== -1) {
+            notes.value[idx] = { ...notes.value[idx], folderId: note.folderId }
+        }
+        if (currentNote.value?.id === noteId) {
+            currentNote.value = note
+        }
+    }
+
     return {
         notes,
         currentNote,
@@ -95,5 +115,6 @@ export const useNotesStore = defineStore('notes', () => {
         createNote,
         updateNote,
         deleteNote,
+        moveNote,
     }
 })

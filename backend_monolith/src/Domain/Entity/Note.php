@@ -33,6 +33,10 @@ class Note
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $content;
 
+    #[ORM\ManyToOne(targetEntity: Folder::class, inversedBy: 'notes')]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?Folder $folder = null;
+
     public function __construct(string $title, ?string $content = null)
     {
         $this->id = Uuid::v7();
@@ -63,5 +67,20 @@ class Note
     public function setContent(?string $content): void
     {
         $this->content = $content;
+    }
+
+    public function getFolder(): ?Folder
+    {
+        return $this->folder;
+    }
+
+    public function setFolder(?Folder $folder): void
+    {
+        $this->folder = $folder;
+    }
+
+    public function getFolderId(): ?string
+    {
+        return $this->folder?->getId()->toRfc4122();
     }
 }

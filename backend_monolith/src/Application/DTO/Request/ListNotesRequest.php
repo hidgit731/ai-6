@@ -11,6 +11,7 @@ class ListNotesRequest
     public function __construct(
         #[Assert\Positive(message: 'Значение должно быть положительным числом.')]
         public readonly int $page = 1,
+        public readonly ?string $folderId = null,
     ) {
     }
 }

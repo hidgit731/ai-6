@@ -8,6 +8,7 @@ use App\Application\DTO\Request\CreateNoteRequest;
 use App\Application\DTO\Response\NoteResponse;
 use App\Application\Service\NoteService;
 use App\Domain\Entity\Note;
+use App\Domain\Repository\FolderRepositoryInterface;
 use App\Domain\Repository\NoteRepositoryInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -15,12 +16,14 @@ use PHPUnit\Framework\TestCase;
 class NoteServiceCreateTest extends TestCase
 {
     private NoteRepositoryInterface&MockObject $repository;
+    private FolderRepositoryInterface&MockObject $folderRepository;
     private NoteService $service;
 
     protected function setUp(): void
     {
         $this->repository = $this->createMock(NoteRepositoryInterface::class);
-        $this->service = new NoteService($this->repository);
+        $this->folderRepository = $this->createMock(FolderRepositoryInterface::class);
+        $this->service = new NoteService($this->repository, $this->folderRepository);
     }
 
     public function testCreateWithValidDataReturnsNoteResponse(): void

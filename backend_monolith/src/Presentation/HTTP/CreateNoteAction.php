@@ -11,6 +11,7 @@ use Symfony\Component\DependencyInjection\Attribute\AsController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
@@ -26,6 +27,7 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
             properties: [
                 new OA\Property(property: 'title', type: 'string', example: 'Новая заметка'),
                 new OA\Property(property: 'content', type: 'string', nullable: true, example: '# Содержимое'),
+                new OA\Property(property: 'folderId', type: 'string', nullable: true, example: null),
             ]
         )
     ),
@@ -49,6 +51,7 @@ class CreateNoteAction
         $dto = new CreateNoteRequest(
             title: (string) ($body['title'] ?? ''),
             content: isset($body['content']) ? (string) $body['content'] : null,
+            folderId: isset($body['folderId']) ? (string) $body['folderId'] : null,
         );
 
         $violations = $this->validator->validate($dto);
@@ -61,7 +64,11 @@ class CreateNoteAction
             return new JsonResponse(['errors' => $errors], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        $response = $this->noteService->create($dto);
+        try {
+            $response = $this->noteService->create($dto);
+        } catch (NotFoundHttpException $e) {
+            return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_NOT_FOUND);
+        }
 
         return new JsonResponse((array) $response, Response::HTTP_CREATED);
     }

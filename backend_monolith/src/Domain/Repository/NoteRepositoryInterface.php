@@ -16,6 +16,15 @@ interface NoteRepositoryInterface
      */
     public function findPaginated(int $page, int $perPage): array;
 
+    /**
+     * @param string|null $folderId null = all, 'none' = no folder, UUID = specific folder
+     *
+     * @return array{items: Note[], total: int}
+     */
+    public function findByFolderIdPaginated(?string $folderId, int $page, int $perPage): array;
+
+    public function countByFolderId(?string $folderId): int;
+
     public function save(Note $note): void;
 
     public function delete(Note $note): void;

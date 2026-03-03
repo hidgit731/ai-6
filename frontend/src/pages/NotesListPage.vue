@@ -1,16 +1,35 @@
 <script setup lang="ts">
-import { onMounted, watch, ref } from 'vue'
+import { onMounted, watch, ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import NoteCard from '@/components/NoteCard.vue'
 import Pagination from '@/components/Pagination.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { useNotesStore } from '@/stores/notes'
+import { useFoldersStore } from '@/stores/folders'
 
 const route = useRoute()
 const router = useRouter()
 const notesStore = useNotesStore()
+const foldersStore = useFoldersStore()
 
 const deleteTarget = ref<string | null>(null)
+
+const pageTitle = computed(() => {
+    const fid = foldersStore.selectedFolderId
+    if (fid === null) return 'Заметки'
+    if (fid === 'none') return 'Без папки'
+    const node = findInTree(foldersStore.tree, fid)
+    return node ? node.name : 'Заметки'
+})
+
+function findInTree(nodes: typeof foldersStore.tree, id: string): { name: string } | null {
+    for (const n of nodes) {
+        if (n.id === id) return n
+        const found = findInTree(n.children, id)
+        if (found) return found
+    }
+    return null
+}
 
 function currentPage(): number {
     const p = Number(route.query.page)
@@ -27,6 +46,14 @@ watch(() => route.query.page, () => loadPage(currentPage()))
 
 function handlePageChange(page: number): void {
     router.push({ name: 'notes-list', query: { page } })
+}
+
+async function handleCreate(): Promise<void> {
+    const fid = foldersStore.selectedFolderId
+    router.push({
+        name: 'note-create',
+        query: fid ? { folderId: String(fid) } : {},
+    })
 }
 
 async function confirmDelete(): Promise<void> {
@@ -48,8 +75,8 @@ async function confirmDelete(): Promise<void> {
 <template>
     <div class="notes-list-page">
         <div class="page-header">
-            <h1 class="page-title">Заметки</h1>
-            <button class="btn-create" @click="router.push({ name: 'note-create' })">
+            <h1 class="page-title">{{ pageTitle }}</h1>
+            <button class="btn-create" @click="handleCreate">
                 + Новая заметка
             </button>
         </div>
@@ -62,8 +89,11 @@ async function confirmDelete(): Promise<void> {
 
         <template v-else>
             <div v-if="notesStore.notes.length === 0" class="empty-state">
-                <p>Заметок пока нет.</p>
-                <button class="btn-create" @click="router.push({ name: 'note-create' })">
+                <p v-if="foldersStore.selectedFolderId !== null">
+                    В этой папке пока нет заметок.
+                </p>
+                <p v-else>Заметок пока нет.</p>
+                <button class="btn-create" @click="handleCreate">
                     Создать первую заметку
                 </button>
             </div>

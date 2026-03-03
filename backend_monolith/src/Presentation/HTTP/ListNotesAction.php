@@ -23,6 +23,7 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
     summary: 'Список заметок с пагинацией',
     parameters: [
         new OA\Parameter(name: 'page', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 1)),
+        new OA\Parameter(name: 'folderId', in: 'query', required: false, schema: new OA\Schema(type: 'string', nullable: true)),
     ],
     responses: [
         new OA\Response(response: 200, description: 'Список заметок'),
@@ -40,8 +41,11 @@ class ListNotesAction
     public function __invoke(Request $request): JsonResponse
     {
         $page = (int) $request->query->get('page', 1);
+        $folderId = $request->query->has('folderId')
+            ? ($request->query->get('folderId') ?: null)
+            : null;
 
-        $dto = new ListNotesRequest(page: $page);
+        $dto = new ListNotesRequest(page: $page, folderId: $folderId);
 
         $violations = $this->validator->validate($dto);
         if (\count($violations) > 0) {

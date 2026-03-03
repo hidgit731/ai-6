@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import MoveNoteModal from './MoveNoteModal.vue'
+import { useNotesStore } from '@/stores/notes'
 import type { NoteListItem } from '@/composables/useNotes'
 
 const props = defineProps<{
@@ -7,6 +10,8 @@ const props = defineProps<{
 }>()
 
 const router = useRouter()
+const notesStore = useNotesStore()
+const showMoveModal = ref(false)
 
 function formatDate(isoDate: string): string {
     return new Date(isoDate).toLocaleDateString('ru-RU', {
@@ -15,6 +20,11 @@ function formatDate(isoDate: string): string {
         year: 'numeric',
     })
 }
+
+async function handleMoveConfirm(folderId: string | null): Promise<void> {
+    showMoveModal.value = false
+    await notesStore.moveNote(props.note.id, folderId)
+}
 </script>
 
 <template>
@@ -22,7 +32,24 @@ function formatDate(isoDate: string): string {
         <h2 class="note-title">{{ props.note.title }}</h2>
         <p class="note-date">{{ formatDate(props.note.createdAt) }}</p>
         <p v-if="props.note.preview" class="note-preview">{{ props.note.preview }}</p>
+        <div class="note-card__footer">
+            <span v-if="props.note.folderId" class="note-folder-badge">📁</span>
+            <button
+                class="note-card__move-btn"
+                title="Переместить в папку"
+                @click.stop="showMoveModal = true"
+            >
+                Переместить
+            </button>
+        </div>
     </div>
+
+    <MoveNoteModal
+        v-if="showMoveModal"
+        :current-folder-id="props.note.folderId"
+        @confirm="handleMoveConfirm"
+        @cancel="showMoveModal = false"
+    />
 </template>
 
 <style scoped>
@@ -59,11 +86,38 @@ function formatDate(isoDate: string): string {
 .note-preview {
     font-size: 0.9rem;
     color: #555;
-    margin: 0;
+    margin: 0 0 0.5rem;
     overflow: hidden;
     text-overflow: ellipsis;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
+}
+
+.note-card__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 0.25rem;
+}
+
+.note-folder-badge {
+    font-size: 0.8rem;
+    color: #4a90d9;
+}
+
+.note-card__move-btn {
+    background: none;
+    border: none;
+    font-size: 0.8rem;
+    color: #888;
+    cursor: pointer;
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+}
+
+.note-card__move-btn:hover {
+    background: #f0f0f0;
+    color: #4a90d9;
 }
 </style>

@@ -164,6 +164,75 @@ GitHub Actions запускает при каждом Pull Request:
 
 ## Changelog
 
+### [005] Notes Folders — 2026-03-04
+
+Реализована иерархическая система папок для заметок: самоссылочное дерево папок (до 5 уровней вложенности), привязка заметок к папкам, перемещение папок и заметок между папками.
+
+**Backend — добавлено:**
+
+- **`src/Domain/Entity/Folder`** — самоссылочная сущность: `id` (UUID v7), `name` (VARCHAR 255), `parent` (nullable FK на себя, ON DELETE RESTRICT), `children` (OneToMany), `notes` (OneToMany), `created_at`, `updated_at`. Индекс по `parent_id`.
+- **`src/Domain/Entity/Note`** — добавлено поле `folder` (nullable ManyToOne → Folder, ON DELETE SET NULL), индекс `idx_note_folder_id`.
+- **`src/Domain/Repository/FolderRepositoryInterface`** — контракт: `save`, `findById`, `findAll`, `findByParentAndName`, `delete`.
+- **`src/Infrastructure/Persistence/Repository/DoctrineFolderRepository`** — реализация на Doctrine ORM; `findByParentAndName()` обрабатывает `null`-родителя через `f.parent IS NULL`.
+- **`src/Application/DTO/Request/`** — `CreateFolderRequest`, `UpdateFolderRequest`, `MoveFolderRequest`, `MoveNoteToFolderRequest`; расширены `CreateNoteRequest`, `UpdateNoteRequest`, `ListNotesRequest` (поле `folder_id`).
+- **`src/Application/DTO/Response/`** — `FolderResponse`, `FolderTreeNodeResponse`; расширены `NoteResponse`, `NoteListItemResponse` (поле `folder_id`).
+- **`src/Application/Service/FolderService`** — оркестрирует операции с папками:
+  - `create` / `update` — создание и переименование с проверкой уникальности в пределах родителя.
+  - `delete(id, strategy)` — удаление: `strategy=reassign` поднимает дочерние папки и заметки к родителю, `strategy=remove` рекурсивно удаляет. Отклоняет удаление папок с детьми без явной стратегии (`400`).
+  - `getTree()` — возвращает дерево всех папок (`FolderTreeNodeResponse[]`).
+  - `move()` — перемещает папку с проверкой глубины вложенности (`MAX_DEPTH = 5`).
+- **`src/Application/Service/NoteService`** — расширен: принимает `FolderRepositoryInterface` вторым аргументом конструктора; поддерживает фильтрацию `list()` по `folder_id`, привязку папки при `create`/`update`, метод `moveToFolder()`.
+- **Новые Action-контроллеры** (`src/Presentation/HTTP/`):
+
+  | Контроллер | Маршрут |
+  |---|---|
+  | `CreateFolderAction` | `POST /api/folders` |
+  | `UpdateFolderAction` | `PUT /api/folders/{id}` |
+  | `DeleteFolderAction` | `DELETE /api/folders/{id}` |
+  | `GetFolderTreeAction` | `GET /api/folders/tree` |
+  | `MoveFolderAction` | `PUT /api/folders/{id}/move` |
+  | `MoveNoteToFolderAction` | `PUT /api/notes/{id}/move` |
+
+- **`migrations/Version20260304000001`** — создание таблицы `folder`; `UNIQUE NULLS NOT DISTINCT (parent_id, name)` (PostgreSQL 15+, гарантирует уникальность имён внутри одного родителя, включая `NULL`-родителя); добавление `folder_id` в `note`; FK `ON DELETE RESTRICT` (папка) и `ON DELETE SET NULL` (заметка).
+
+**Backend — тесты:**
+
+| Файл | Тип | Описание |
+|------|-----|----------|
+| `tests/Unit/Application/Service/FolderServiceTest` | Unit | Создание, переименование, удаление (со стратегиями), перемещение, ограничение глубины — с моками репозитория |
+
+**Frontend — добавлено:**
+
+- **`src/stores/folders.ts`** (Pinia) — состояние дерева папок, выбранной папки, развёрнутых узлов (персистентность через `localStorage`); actions: `fetchTree`, `createFolder`, `updateFolder`, `deleteFolder`, `moveFolder`, `selectFolder`, `toggleExpanded`.
+- **`src/composables/useFolders.ts`** — все HTTP-вызовы к `/api/folders` (GET tree, POST, PUT, DELETE, PUT move).
+- **`src/composables/useToast.ts`** — система toast-уведомлений (создание, авто-удаление).
+- **Новые компоненты**:
+  - `FolderTree.vue` — дерево папок с пунктом «Все заметки» и рекурсивными узлами.
+  - `FolderTreeNode.vue` — узел дерева с раскрытием/сворачиванием и выделением.
+  - `FolderContextMenu.vue` — контекстное меню папки (переименовать, переместить, удалить); оптимистичное удаление: `204` → тихое, `400` → диалог стратегии.
+  - `DeleteFolderDialog.vue` — диалог выбора стратегии удаления (`reassign` / `remove`).
+  - `MoveFolderModal.vue` — модальное окно перемещения папки в другой родительский узел.
+  - `MoveNoteModal.vue` — модальное окно перемещения заметки в папку.
+  - `SkeletonList.vue` — скелетон-загрузка для списков.
+  - `ToastContainer.vue` — контейнер для отображения toast-уведомлений.
+- **`AppLayout.vue`** — интегрирован `FolderTree`; боковая панель с деревом папок.
+- **`NoteCard.vue`** — расширен: отображает принадлежность заметки к папке.
+- **`NotesListPage.vue`** — фильтрация заметок по выбранной папке.
+- **`src/stores/notes.ts`** — синхронизирован с выбранной папкой из `useFoldersStore`.
+
+**API — добавленные эндпоинты:**
+
+| Метод | Путь | Действие |
+|-------|------|----------|
+| `GET` | `/api/folders/tree` | Дерево папок |
+| `POST` | `/api/folders` | Создание папки |
+| `PUT` | `/api/folders/{id}` | Переименование папки |
+| `DELETE` | `/api/folders/{id}[?strategy=reassign\|remove]` | Удаление папки |
+| `PUT` | `/api/folders/{id}/move` | Перемещение папки |
+| `PUT` | `/api/notes/{id}/move` | Перемещение заметки в папку |
+
+---
+
 ### [004] Notes CRUD & Markdown Editor — 2026-03-04
 
 Реализован полный CRUD заметок: REST API на Symfony и SPA-интерфейс на Vue 3 с Markdown-редактором.

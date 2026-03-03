@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace App\Presentation\HTTP;
 
-use App\Application\DTO\Request\UpdateNoteRequest;
+use App\Application\DTO\Request\MoveNoteToFolderRequest;
 use App\Application\Service\NoteService;
-use OpenApi\Attributes as OA;
 use Symfony\Component\DependencyInjection\Attribute\AsController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -17,31 +16,8 @@ use Symfony\Component\Uid\Uuid;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 #[AsController]
-#[Route('/api/notes/{id}', methods: ['PUT'])]
-#[OA\Put(
-    path: '/api/notes/{id}',
-    summary: 'Обновление заметки',
-    parameters: [
-        new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
-    ],
-    requestBody: new OA\RequestBody(
-        required: true,
-        content: new OA\JsonContent(
-            required: ['title'],
-            properties: [
-                new OA\Property(property: 'title', type: 'string', example: 'Обновлённый заголовок'),
-                new OA\Property(property: 'content', type: 'string', nullable: true, example: '# Обновлённое содержимое'),
-                new OA\Property(property: 'folderId', type: 'string', nullable: true, example: null),
-            ]
-        )
-    ),
-    responses: [
-        new OA\Response(response: 200, description: 'Заметка обновлена'),
-        new OA\Response(response: 404, description: 'Заметка не найдена'),
-        new OA\Response(response: 422, description: 'Ошибки валидации'),
-    ]
-)]
-class UpdateNoteAction
+#[Route('/api/notes/{id}/folder', methods: ['PATCH'])]
+class MoveNoteToFolderAction
 {
     public function __construct(
         private readonly NoteService $noteService,
@@ -59,9 +35,7 @@ class UpdateNoteAction
 
         $body = json_decode($request->getContent(), true) ?? [];
 
-        $dto = new UpdateNoteRequest(
-            title: (string) ($body['title'] ?? ''),
-            content: isset($body['content']) ? (string) $body['content'] : null,
+        $dto = new MoveNoteToFolderRequest(
             folderId: isset($body['folderId']) ? ((string) $body['folderId'] ?: null) : null,
         );
 
@@ -75,10 +49,8 @@ class UpdateNoteAction
             return new JsonResponse(['errors' => $errors], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        $changeFolderId = \array_key_exists('folderId', $body);
-
         try {
-            $response = $this->noteService->update($uuid, $dto, $changeFolderId);
+            $response = $this->noteService->moveNoteToFolder($uuid, $dto);
         } catch (NotFoundHttpException $e) {
             return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_NOT_FOUND);
         }
