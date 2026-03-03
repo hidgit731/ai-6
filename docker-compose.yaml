@@ -1,0 +1,89 @@
+services:
+
+  nginx:
+    image: 'nginx:1.27-alpine'
+    container_name: 'notes_nginx'
+    restart: "no"
+    ports:
+      - '${APP_PORT:-8080}:80'
+    volumes:
+      - ./backend_monolith:/var/www/backend_monolith
+      - ./deploy/dev/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend_monolith
+      - frontend
+    networks:
+      - notes_network
+
+
+  postgres:
+    image: 'postgres:18.1-bookworm'
+    container_name: 'notes_postgres'
+    restart: "no"
+    ports:
+      - '${FORWARD_DB_PORT:-5432}:5432'
+    environment:
+      POSTGRES_DB: '${DB_NAME:-app}'
+      POSTGRES_USER: '${DB_USER:-app}'
+      POSTGRES_PASSWORD: '${DB_PASSWORD:-secret}'
+    volumes:
+      - 'postgres_data:/var/lib/postgresql'
+      - 'postgres_dump:/app/dump'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USER:-app}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - notes_network
+
+
+  backend_monolith:
+    build:
+      context: ./backend_monolith/deploy/dev
+      args:
+        PUID: '${HOST_USER_UID:-1000}'
+        PGID: '${HOST_USER_GID:-1000}'
+    user: '${HOST_USER_UID:-1000}:${HOST_USER_GID:-1000}'
+    container_name: 'notes_backend_monolith'
+    working_dir: '/app'
+    restart: "no"
+    volumes:
+      - ./backend_monolith:/app
+      - '${HOST_COMPOSER_CACHE_DIR:-~/.cache/composer}:${CONTAINER_COMPOSER_CACHE_DIR:-/.composer/cache}'
+    command: sh -c "composer install && php-fpm"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - notes_network
+
+
+  frontend:
+    build:
+      context: ./frontend/deploy/dev
+      args:
+        PUID: '${HOST_USER_UID:-1000}'
+        PGID: '${HOST_USER_GID:-1000}'
+    user: '${HOST_USER_UID:-1000}:${HOST_USER_GID:-1000}'
+    container_name: 'notes_frontend'
+    working_dir: '/app'
+    restart: "no"
+    volumes:
+      - ./frontend:/app
+      - 'frontend_node_modules:/app/node_modules'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - notes_network
+
+
+networks:
+  notes_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  postgres_dump:
+  frontend_node_modules:

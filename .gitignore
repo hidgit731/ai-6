@@ -1,1 +1,11 @@
 /.idea
+
+# Local environment — copy from .env.example, never commit actual secrets
+/.env
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

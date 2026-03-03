@@ -160,6 +160,39 @@ GitHub Actions запускает при каждом Pull Request:
 
 ## Changelog
 
+### [003] Docker Infrastructure Initialized — 2026-03-04
+
+Настроено полное Docker Compose окружение для dev и prod.
+
+**Добавлено:**
+
+- **`docker-compose.yaml`** (dev) — 4 сервиса:
+  - `notes_nginx` (`nginx:1.27-alpine`) — точка входа, маршрутизация `/api/` → PHP-FPM, `/` → Vite dev-сервер
+  - `notes_postgres` (`postgres:18.1-bookworm`) — БД с healthcheck и именованными volumes
+  - `notes_backend_monolith` (`php:8.4-fpm-alpine`) — PHP-FPM с Xdebug (trigger mode), bind-mount исходников
+  - `notes_frontend` (`node:20-alpine`) — Vite dev-сервер с bind-mount и изолированным `node_modules`
+- **`docker-compose.prod.yaml`** — prod override: `restart: unless-stopped`, убран bind-mount исходников, закрыт порт БД
+- **`backend_monolith/deploy/dev/Dockerfile`** — `php:8.4-fpm-alpine`, Composer 2.9.5, Xdebug 3.5.0, non-root пользователь через `PUID`/`PGID`
+- **`backend_monolith/deploy/prod/Dockerfile`** — multi-stage: `builder` (composer install --no-dev) → `production`
+- **`backend_monolith/deploy/dev/php/php.ini`** и **`backend_monolith/deploy/prod/php/php.ini`** — кастомные php.ini для dev/prod
+- **`frontend/deploy/dev/Dockerfile`** — `node:20-alpine`, non-root пользователь, `CMD npm run dev --host 0.0.0.0`
+- **`frontend/deploy/prod/Dockerfile`** — multi-stage: `node:20-alpine` (сборка `dist/`) → `nginx:1.27-alpine` (отдача статики + SPA fallback)
+- **`deploy/dev/nginx/nginx.conf`** — FastCGI для `/api/`, WebSocket proxy для HMR Vite
+- **`deploy/prod/nginx/nginx.conf`** — FastCGI для `/api/`, статика из `dist/` с SPA fallback
+- **`.env.example`** (корень) — `APP_PORT`, `FORWARD_DB_PORT`, `DB_*`, `HOST_USER_UID/GID`, пути к кэшу Composer
+- **`backend_monolith/.env.example`** — `APP_ENV`, `APP_SECRET`, `DATABASE_URL`
+- **`.editorconfig`** — UTF-8, LF, 4 spaces; docker-compose файлы — 2 spaces
+
+**Архитектурные решения:**
+
+- Именованные Docker volumes (`postgres_data`, `postgres_dump`, `frontend_node_modules`) — данные не хранятся в bind-mount
+- Сеть `notes_network` (bridge) — все сервисы объявляют её явно
+- В dev исходный код монтируется через bind-mount, в prod — копируется в образ через multi-stage build
+- Xdebug только в dev-образе, в режиме `start_with_request=trigger` (не замедляет каждый запрос)
+- Контейнеры запускаются от non-root пользователя (кроме nginx), UID/GID пробрасываются через build args
+
+---
+
 ### [002] Frontend Initialized — 2026-03-01
 
 Инициализирован фронтенд-сервис (`frontend/`) на базе Vue 3 + Vite.
