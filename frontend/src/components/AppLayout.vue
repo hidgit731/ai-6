@@ -77,6 +77,7 @@ import SearchBar from './SearchBar.vue'
   &__sidebar {
     flex-shrink: 0;
     overflow-y: auto;
+    border-right: 1px solid #e8e8e8;
   }
 
   &__main {

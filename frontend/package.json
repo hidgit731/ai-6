@@ -15,6 +15,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "diff": "^8.0.3",
     "dompurify": "^3.3.1",
     "marked": "^17.0.3",
     "pinia": "^3.0.4",
@@ -22,6 +23,7 @@
     "vue-router": "^5.0.3"
   },
   "devDependencies": {
+    "@types/diff": "^7.0.2",
     "@types/dompurify": "^3.0.5",
     "@vitejs/plugin-vue": "^6.0.4",
     "@vue/test-utils": "^2.4.6",

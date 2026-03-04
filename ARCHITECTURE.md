@@ -164,6 +164,88 @@ GitHub Actions запускает при каждом Pull Request:
 
 ## Changelog
 
+### [009] Note Version History — 2026-03-07
+
+Реализована система версионирования заметок: сохранение истории изменений для каждой заметки, возможность просмотра всех версий, сравнение версий, восстановление заметки к предыдущей версии.
+
+**Backend — добавлено:**
+
+- **`src/Domain/Entity/NoteVersion`** — сущность версии: `id` (UUID v7), `note_id` (FK CASCADE), `title` (VARCHAR 255), `content` (TEXT nullable), `version_number` (INT), `created_at` (DATETIME). Индексы по `note_id` и `(note_id, version_number DESC)`. Immutable сущность (без TimestampsTrait).
+- **`src/Domain/Repository/NoteVersionRepositoryInterface`** — контракт: `save`, `findByNoteId(paginatedId, page, limit)`, `findByNoteIdAndNumber(noteId, number)`, `deleteByNoteId(noteId)`.
+- **`src/Infrastructure/Persistence/Repository/DoctrineNoteVersionRepository`** — реализация на Doctrine ORM:
+  - `findByNoteId()` — пагинированный поиск версий (сортировка по `version_number DESC`).
+  - отдельный COUNT QueryBuilder для пагинации.
+- **`src/Application/DTO/Request/ListNoteVersionsRequest`** — запрос списка версий (page).
+- **`src/Application/DTO/Response/NoteVersionResponse`** — ответ версии (id, version_number, title, content, created_at).
+- **`src/Application/DTO/Response/PaginatedNoteVersionsResponse`** — список версий (items, total, page, perPage, pages).
+- **`src/Application/Service/NoteVersionService`** — сервис версионирования:
+  - `getVersions(noteId, page)` — получить список версий через репозиторий.
+  - `getVersion(noteId, versionNumber)` — получить конкретную версию.
+  - `revert(noteId, targetVersionNumber)` — восстановление: берёт версию из БД, создаёт snapshot текущего состояния как новую версию, затем восстанавливает содержимое заметки.
+- **`src/Application/Service/NoteService`** — расширен:
+  - принимает `NoteVersionRepositoryInterface` четвёртым аргументом конструктора.
+  - метод `update()` перед применением изменений создаёт снимок текущего состояния как новую версию (сохраняет `version_number + 1`).
+- **Новые Action-контроллеры** (`src/Presentation/HTTP/`):
+
+  | Контроллер                | Маршрут                              |
+  |---------------------------|--------------------------------------|
+  | `ListNoteVersionsAction`  | `GET /api/notes/{id}/versions`       |
+  | `GetNoteVersionAction`    | `GET /api/notes/{id}/versions/{num}` |
+  | `RevertNoteVersionAction` | `POST /api/notes/{id}/revert`        |
+
+- **`migrations/Version20260307000001.php`** — создание таблицы `note_version` (UUID PK, note_id FK CASCADE, title, content, version_number, created_at); индексы по `note_id` и `(note_id, version_number DESC)`.
+- **Новый пакет**: `symfony/asset ^8.0` (для асинхронной оптимизации при необходимости).
+
+**Backend — тесты:**
+
+| Файл                                                     | Тип         | Описание                                                     |
+|----------------------------------------------------------|-------------|--------------------------------------------------------------|
+| `tests/Integration/Action/ListNoteVersionsActionTest`    | Integration | GET /api/notes/{id}/versions, пагинация                      |
+| `tests/Integration/Action/GetNoteVersionActionTest`      | Integration | GET /api/notes/{id}/versions/{num}, 404 при отсутствии       |
+| `tests/Integration/Action/RevertNoteVersionActionTest`   | Integration | POST /api/notes/{id}/revert, история до/после revert         |
+| `tests/Unit/Application/Service/NoteVersionServiceTest`  | Unit        | getVersions, getVersion, revert — мокированные репозитории   |
+| `tests/Unit/Application/Service/NoteServiceUpdateTest`   | Unit        | Обновление с snapshots (проверка создания версий)            |
+
+**Frontend — добавлено:**
+
+- **`src/composables/useNoteVersions.ts`** — composable для версионирования:
+  - `getVersions(noteId, page)` — GET запрос к `/api/notes/{id}/versions`.
+  - `getVersion(noteId, versionNumber)` — GET запрос к `/api/notes/{id}/versions/{num}`.
+  - `revert(noteId, targetVersionNumber)` — POST запрос к `/api/notes/{id}/revert`.
+- **`src/stores/noteVersions.ts`** (Pinia) — хранилище состояния версий:
+  - state: `versions` (список NoteVersionResponse), `currentVersion` (NoteVersionResponse), `pagination` (page, perPage, total, pages).
+  - actions: `fetchVersions(noteId, page)`, `fetchVersion(noteId, num)`, `revert(noteId, targetNum)`.
+- **`src/components/VersionHistoryPanel.vue`** — панель истории версий:
+  - infinite scroll через IntersectionObserver (автоматическая загрузка при прокрутке).
+  - список версий с датой создания и номером версии.
+  - кнопка восстановления для каждой версии.
+  - интеграция с `useNoteVersionsStore`.
+- **`src/components/VersionDiffView.vue`** — компонент отображения разницы версий:
+  - компонент сравнения двух текстов (текущая версия vs выбранная).
+  - использует `diff` библиотеку (diffWords) для подсвечивания изменений.
+  - отображает старый и новый текст side-by-side.
+- **`src/pages/NoteEditPage.vue`** — расширена:
+  - кнопка "История" открывает `VersionHistoryPanel`.
+  - watch на `notesStore.currentNote` для реактивного обновления при восстановлении версии.
+  - интеграция с `useNoteVersionsStore`.
+- **Новые пакеты**: `diff ^5.5.0` (для diffWords при сравнении версий).
+
+**Frontend — тесты:**
+
+- `src/composables/useNoteVersions.test.ts` (Unit, Vitest) — GET версий, получить версию, восстановить.
+- `src/components/__tests__/VersionHistoryPanel.test.ts` (Unit, Vitest) — infinite scroll, клик восстановить.
+- `src/components/__tests__/VersionDiffView.test.ts` (Unit, Vitest) — рендеринг diff, отмечены изменения.
+
+**API — новые эндпоинты:**
+
+| Метод  | Путь                                  | Действие                              |
+|--------|---------------------------------------|---------------------------------------|
+| `GET`  | `/api/notes/{id}/versions`            | Список версий (пагинация)             |
+| `GET`  | `/api/notes/{id}/versions/{number}`   | Получить конкретную версию            |
+| `POST` | `/api/notes/{id}/revert`              | Восстановить из версии                |
+
+---
+
 ### [008] Full-text Search — 2026-03-06
 
 Реализована полнотекстовая поиск по заметкам с использованием встроенного PostgreSQL `tsvector` и `tsquery`. Поддержка поиска по названию и содержимому с учётом русского языка, ранжирование результатов по релевантности, пагинация результатов поиска.

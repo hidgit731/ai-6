@@ -13,9 +13,11 @@ use App\Application\DTO\Response\NoteResponse;
 use App\Application\DTO\Response\PaginatedNotesResponse;
 use App\Application\DTO\Response\TagResponse;
 use App\Domain\Entity\Note;
+use App\Domain\Entity\NoteVersion;
 use App\Domain\Entity\Tag;
 use App\Domain\Repository\FolderRepositoryInterface;
 use App\Domain\Repository\NoteRepositoryInterface;
+use App\Domain\Repository\NoteVersionRepositoryInterface;
 use App\Domain\Repository\TagRepositoryInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Uid\Uuid;
@@ -28,6 +30,7 @@ class NoteService
         private readonly NoteRepositoryInterface $noteRepository,
         private readonly FolderRepositoryInterface $folderRepository,
         private readonly TagRepositoryInterface $tagRepository,
+        private readonly NoteVersionRepositoryInterface $versionRepository,
     ) {
     }
 
@@ -56,6 +59,10 @@ class NoteService
         if (null === $note) {
             throw new NotFoundHttpException('Заметка не найдена.');
         }
+
+        $nextNum = $this->versionRepository->countByNoteId($note->getId()) + 1;
+        $version = new NoteVersion($note, $note->getTitle(), $note->getContent(), $nextNum);
+        $this->versionRepository->save($version);
 
         $note->setTitle($request->title);
         $note->setContent($request->content);
@@ -160,6 +167,7 @@ class NoteService
     {
         $note->toggleFavorite();
         $this->noteRepository->save($note);
+
         return $note;
     }
 
@@ -167,6 +175,7 @@ class NoteService
     {
         $note->softDelete();
         $this->noteRepository->save($note);
+
         return $note;
     }
 
@@ -192,6 +201,7 @@ class NoteService
         }
         $note->restore();
         $this->noteRepository->save($note);
+
         return $note;
     }
 

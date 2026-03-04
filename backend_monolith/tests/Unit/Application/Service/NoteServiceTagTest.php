@@ -11,6 +11,7 @@ use App\Domain\Entity\Note;
 use App\Domain\Entity\Tag;
 use App\Domain\Repository\FolderRepositoryInterface;
 use App\Domain\Repository\NoteRepositoryInterface;
+use App\Domain\Repository\NoteVersionRepositoryInterface;
 use App\Domain\Repository\TagRepositoryInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -32,6 +33,7 @@ class NoteServiceTagTest extends TestCase
             $this->noteRepository,
             $this->folderRepository,
             $this->tagRepository,
+            $this->createMock(NoteVersionRepositoryInterface::class),
         );
     }
 

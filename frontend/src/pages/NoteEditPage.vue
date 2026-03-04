@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import TagInput from '@/components/TagInput.vue'
+import VersionHistoryPanel from '@/components/VersionHistoryPanel.vue'
 import { useNotesStore } from '@/stores/notes'
+import { useNoteVersionsStore } from '@/stores/noteVersions'
 
 const route = useRoute()
 const router = useRouter()
 const notesStore = useNotesStore()
+const noteVersionsStore = useNoteVersionsStore()
 
 const isEditMode = computed(() => route.name === 'note-edit')
 const noteId = computed(() => route.params.id as string | undefined)
@@ -29,6 +32,18 @@ onMounted(async () => {
         }
     }
 })
+
+// Sync editor when store.currentNote is updated after a revert
+watch(
+    () => notesStore.currentNote,
+    (note) => {
+        if (note) {
+            title.value = note.title
+            content.value = note.content ?? ''
+            tags.value = note.tags.map((t) => t.name)
+        }
+    },
+)
 
 async function handleSave(): Promise<void> {
     titleError.value = null
@@ -73,6 +88,14 @@ async function handleSave(): Promise<void> {
         <div class="page-header">
             <button class="btn-back" @click="router.back()">← Назад</button>
             <h1 class="page-title">{{ isEditMode ? 'Редактирование заметки' : 'Новая заметка' }}</h1>
+            <button
+                v-if="isEditMode && noteId"
+                class="btn-history"
+                type="button"
+                @click="noteVersionsStore.openPanel(noteId!)"
+            >
+                History
+            </button>
         </div>
 
         <div v-if="notesStore.loading && isEditMode" class="loading">Загрузка...</div>
@@ -98,6 +121,13 @@ async function handleSave(): Promise<void> {
                 </button>
             </div>
         </template>
+
+        <VersionHistoryPanel
+            v-if="noteVersionsStore.isPanelOpen && noteId"
+            :note-id="noteId"
+            :current-title="title"
+            :current-content="content || null"
+        />
     </div>
 </template>
 
@@ -115,6 +145,21 @@ async function handleSave(): Promise<void> {
     display: flex;
     align-items: center;
     gap: 1rem;
+}
+
+.btn-history {
+    margin-left: auto;
+    background: none;
+    border: 1px solid #4a90d9;
+    color: #4a90d9;
+    padding: 0.4rem 0.8rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.btn-history:hover {
+    background: #f0f7ff;
 }
 
 .btn-back {

@@ -153,7 +153,7 @@ function handleSelectFolder(folderId: string): void {
 .folder-tree {
     width: 220px;
     min-width: 180px;
-    border-right: 1px solid #e8e8e8;
+
     padding: 0.75rem 0;
     display: flex;
     flex-direction: column;
