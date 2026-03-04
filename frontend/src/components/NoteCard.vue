@@ -32,6 +32,9 @@ async function handleMoveConfirm(folderId: string | null): Promise<void> {
         <h2 class="note-title">{{ props.note.title }}</h2>
         <p class="note-date">{{ formatDate(props.note.createdAt) }}</p>
         <p v-if="props.note.preview" class="note-preview">{{ props.note.preview }}</p>
+        <div v-if="props.note.tags && props.note.tags.length > 0" class="note-tags">
+            <span v-for="tag in props.note.tags" :key="tag.id" class="note-tag-badge">{{ tag.name }}</span>
+        </div>
         <div class="note-card__footer">
             <span v-if="props.note.folderId" class="note-folder-badge">📁</span>
             <button
@@ -119,5 +122,20 @@ async function handleMoveConfirm(folderId: string | null): Promise<void> {
 .note-card__move-btn:hover {
     background: #f0f0f0;
     color: #4a90d9;
+}
+
+.note-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin-bottom: 0.4rem;
+}
+
+.note-tag-badge {
+    background: #e8f0fb;
+    color: #4a90d9;
+    border-radius: 3px;
+    padding: 0.1rem 0.4rem;
+    font-size: 0.75rem;
 }
 </style>

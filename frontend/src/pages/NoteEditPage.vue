@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
+import TagInput from '@/components/TagInput.vue'
 import { useNotesStore } from '@/stores/notes'
 
 const route = useRoute()
@@ -13,6 +14,7 @@ const noteId = computed(() => route.params.id as string | undefined)
 
 const title = ref('')
 const content = ref('')
+const tags = ref<string[]>([])
 const titleError = ref<string | null>(null)
 const submitError = ref<string | null>(null)
 const isLoading = ref(false)
@@ -23,6 +25,7 @@ onMounted(async () => {
         if (notesStore.currentNote) {
             title.value = notesStore.currentNote.title
             content.value = notesStore.currentNote.content ?? ''
+            tags.value = notesStore.currentNote.tags.map((t) => t.name)
         }
     }
 })
@@ -41,6 +44,7 @@ async function handleSave(): Promise<void> {
         const payload = {
             title: title.value.trim(),
             content: content.value || null,
+            tags: tags.value,
         }
 
         let note
@@ -78,6 +82,8 @@ async function handleSave(): Promise<void> {
                 v-model:title="title"
                 v-model:content="content"
             />
+
+            <TagInput v-model="tags" placeholder="Добавить тег..." />
 
             <div v-if="titleError" class="field-error">{{ titleError }}</div>
             <div v-if="submitError" class="error-message">{{ submitError }}</div>

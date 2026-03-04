@@ -25,6 +25,14 @@ interface NoteRepositoryInterface
 
     public function countByFolderId(?string $folderId): int;
 
+    /**
+     * @param string|null $folderId null = all folders, 'none' = no folder, UUID = specific folder
+     * @param string[]    $tagNames Empty = no tag filter; AND-logic when > 1 tag
+     *
+     * @return array{items: Note[], total: int}
+     */
+    public function findFilteredPaginated(?string $folderId, array $tagNames, int $page, int $perPage): array;
+
     public function save(Note $note): void;
 
     public function delete(Note $note): void;

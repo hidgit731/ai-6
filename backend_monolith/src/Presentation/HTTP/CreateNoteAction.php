@@ -52,6 +52,7 @@ class CreateNoteAction
             title: (string) ($body['title'] ?? ''),
             content: isset($body['content']) ? (string) $body['content'] : null,
             folderId: isset($body['folderId']) ? (string) $body['folderId'] : null,
+            tags: isset($body['tags']) && \is_array($body['tags']) ? array_filter(array_map('strval', $body['tags'])) : [],
         );
 
         $violations = $this->validator->validate($dto);

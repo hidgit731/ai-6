@@ -2,15 +2,18 @@
 import { onMounted, watch, ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import NoteCard from '@/components/NoteCard.vue'
+import TagCloud from '@/components/TagCloud.vue'
 import Pagination from '@/components/Pagination.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { useNotesStore } from '@/stores/notes'
 import { useFoldersStore } from '@/stores/folders'
+import { useTagsStore } from '@/stores/tags'
 
 const route = useRoute()
 const router = useRouter()
 const notesStore = useNotesStore()
 const foldersStore = useFoldersStore()
+const tagsStore = useTagsStore()
 
 const deleteTarget = ref<string | null>(null)
 
@@ -40,9 +43,33 @@ async function loadPage(page: number): Promise<void> {
     await notesStore.fetchList(page)
 }
 
-onMounted(() => loadPage(currentPage()))
+onMounted(() => {
+    tagsStore.initFromUrl(route.query.tags as string | string[] | undefined)
+    tagsStore.fetchCloud()
+    loadPage(currentPage())
+})
 
 watch(() => route.query.page, () => loadPage(currentPage()))
+
+watch(
+    () => tagsStore.selectedTagNames,
+    (names) => {
+        const query = { ...route.query }
+        if (names.length > 0) {
+            query.tags = names
+        } else {
+            delete query.tags
+        }
+        router.push({ name: 'notes-list', query })
+    },
+)
+
+watch(
+    () => route.query.tags,
+    (newTags) => {
+        tagsStore.initFromUrl(newTags as string | string[] | undefined)
+    },
+)
 
 function handlePageChange(page: number): void {
     router.push({ name: 'notes-list', query: { page } })
@@ -81,6 +108,25 @@ async function confirmDelete(): Promise<void> {
             </button>
         </div>
 
+        <div class="notes-layout">
+            <aside class="notes-sidebar">
+                <h3 class="sidebar-title">Теги</h3>
+                <TagCloud
+                    :tags="tagsStore.tags"
+                    :selected-names="tagsStore.selectedTagNames"
+                    @tag-click="(name) => tagsStore.selectedTagNames.includes(name) ? tagsStore.deselectTag(name) : tagsStore.selectTag(name)"
+                />
+                <button
+                    v-if="tagsStore.selectedTagNames.length > 0"
+                    class="btn-clear-tags"
+                    @click="tagsStore.clearTags()"
+                >
+                    Сбросить фильтр
+                </button>
+            </aside>
+
+            <div class="notes-content">
+
         <div v-if="notesStore.loading" class="loading">Загрузка...</div>
 
         <div v-else-if="notesStore.error" class="error-message">
@@ -117,6 +163,9 @@ async function confirmDelete(): Promise<void> {
                 @page-change="handlePageChange"
             />
         </template>
+
+        </div>
+        </div>
 
         <ConfirmDialog
             v-if="deleteTarget"
@@ -223,5 +272,50 @@ async function confirmDelete(): Promise<void> {
     background: #fee;
     color: #c33;
     border-color: #fcc;
+}
+
+.notes-layout {
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-start;
+}
+
+.notes-sidebar {
+    width: 200px;
+    flex-shrink: 0;
+    border: 1px solid #e8e8e8;
+    border-radius: 6px;
+    padding: 0.75rem;
+    background: #fafafa;
+}
+
+.sidebar-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #555;
+    margin: 0 0 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.notes-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.btn-clear-tags {
+    margin-top: 0.5rem;
+    background: none;
+    border: 1px solid #ddd;
+    color: #888;
+    font-size: 0.8rem;
+    border-radius: 3px;
+    padding: 0.2rem 0.5rem;
+    cursor: pointer;
+    width: 100%;
+}
+
+.btn-clear-tags:hover {
+    background: #f0f0f0;
 }
 </style>

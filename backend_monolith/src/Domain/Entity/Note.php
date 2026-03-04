@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Domain\Entity;
 
 use App\Domain\Trait\TimestampsTrait;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Bridge\Doctrine\IdGenerator\UuidGenerator;
 use Symfony\Bridge\Doctrine\Types\UuidType;
@@ -37,11 +39,16 @@ class Note
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?Folder $folder = null;
 
+    #[ORM\ManyToMany(targetEntity: Tag::class, inversedBy: 'notes')]
+    #[ORM\JoinTable(name: 'note_tag')]
+    private Collection $tags;
+
     public function __construct(string $title, ?string $content = null)
     {
         $this->id = Uuid::v7();
         $this->title = $title;
         $this->content = $content;
+        $this->tags = new ArrayCollection();
     }
 
     public function getId(): Uuid
@@ -82,5 +89,32 @@ class Note
     public function getFolderId(): ?string
     {
         return $this->folder?->getId()->toRfc4122();
+    }
+
+    public function getTags(): Collection
+    {
+        return $this->tags;
+    }
+
+    public function addTag(Tag $tag): void
+    {
+        if (!$this->tags->contains($tag)) {
+            $this->tags->add($tag);
+        }
+    }
+
+    public function removeTag(Tag $tag): void
+    {
+        $this->tags->removeElement($tag);
+    }
+
+    public function clearTags(): void
+    {
+        $this->tags->clear();
+    }
+
+    public function setTags(Collection $tags): void
+    {
+        $this->tags = $tags;
     }
 }

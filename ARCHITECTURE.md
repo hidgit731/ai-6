@@ -6,22 +6,22 @@
 
 ## Технический стек
 
-| Компонент           | Технология                                                          |
-|---------------------|---------------------------------------------------------------------|
-| Backend monolith    | PHP 8.4 + Symfony 8                                                 |
-| ORM                 | Doctrine ORM 3.6 + Doctrine Migrations                             |
-| UUID                | symfony/uid (UUID v7)                                               |
-| API-документация    | nelmio/api-doc-bundle 5.9 (Swagger UI)                             |
-| Frontend            | Vue 3.5 + Vue Router 5.0 + Pinia 3.0                               |
-| Markdown            | marked 17.x + DOMPurify 3.3.x                                      |
-| Сборка Frontend     | Vite 7.3 + TypeScript 5.9                                          |
-| Стили Frontend      | Sass 1.97 (SCSS)                                                   |
-| Тесты Frontend      | Vitest 4.0 (jsdom environment)                                     |
-| База данных         | PostgreSQL 18+                                                     |
-| Инфраструктура      | Docker Compose                                                     |
-| CI                  | GitHub Actions                                                     |
-| Стиль кода PHP      | PHP CS-Fixer (`@Symfony`, `@Symfony:risky`)                        |
-| Тесты PHP           | PHPUnit 13+                                                        |
+| Компонент           | Технология                                                           |
+|---------------------|----------------------------------------------------------------------|
+| Backend monolith    | PHP 8.4 + Symfony 8                                                  |
+| ORM                 | Doctrine ORM 3.6 + Doctrine Migrations                               |
+| UUID                | symfony/uid (UUID v7)                                                |
+| API-документация    | nelmio/api-doc-bundle 5.9 (Swagger UI)                               |
+| Frontend            | Vue 3.5 + Vue Router 5.0 + Pinia 3.0                                 |
+| Markdown            | marked 17.x + DOMPurify 3.3.x                                        |
+| Сборка Frontend     | Vite 7.3 + TypeScript 5.9                                            |
+| Стили Frontend      | Sass 1.97 (SCSS)                                                     |
+| Тесты Frontend      | Vitest 4.0 (jsdom environment)                                       |
+| База данных         | PostgreSQL 18+                                                       |
+| Инфраструктура      | Docker Compose                                                       |
+| CI                  | GitHub Actions                                                       |
+| Стиль кода PHP      | PHP CS-Fixer (`@Symfony`, `@Symfony:risky`)                          |
+| Тесты PHP           | PHPUnit 13+                                                          |
 
 ## Структура репозитория
 
@@ -164,6 +164,82 @@ GitHub Actions запускает при каждом Pull Request:
 
 ## Changelog
 
+### [006] Tags System — 2026-03-05
+
+Реализована система тегирования заметок: поддержка создания и удаления тегов, привязка множественных тегов к заметкам, фильтрация заметок по тегам, облако тегов с подсчётом количества заметок.
+
+**Backend — добавлено:**
+
+- **`src/Domain/Entity/Tag`** — сущность с полями `id` (UUID v7), `name` (VARCHAR 50, UNIQUE), `created_at`, `updated_at`. Индекс по `name`.
+- **`src/Domain/Entity/Note`** — добавлено поле `tags` (ManyToMany → Tag с JoinTable `note_tag`, inversedBy='notes', ON DELETE CASCADE для обеих FK).
+- **`src/Domain/Repository/TagRepositoryInterface`** — контракт: `save`, `findById`, `findByName`, `findPaginated`, `findCloud`, `delete`.
+- **`src/Infrastructure/Persistence/Repository/DoctrineTagRepository`** — реализация на Doctrine ORM:
+  - `findByName(array $names)` — поиск по массиву имён тегов.
+  - `findCloud()` — DQL запрос с `COUNT(n.id)` для облака тегов; возвращает `[[$tag, 'noteCount' => int]]`.
+- **`src/Application/DTO/Request/`** — `CreateTagRequest`, `SuggestTagsRequest`; расширены `CreateNoteRequest`, `UpdateNoteRequest`, `ListNotesRequest` (поле `tag_names[]`).
+- **`src/Application/DTO/Response/`** — `TagResponse`, `TagCloudItemResponse`; расширены `NoteResponse`, `NoteListItemResponse` (поле `tags[]`).
+- **`src/Application/Service/TagService`** — оркестрирует операции с тегами:
+  - `create` — создание тега с проверкой уникальности имени.
+  - `delete(id)` — удаление тега с каскадным удалением из `note_tag`.
+  - `getCloud()` — возвращает облако тегов (`TagCloudItemResponse[]`).
+  - `suggest(prefix)` — поиск тегов по префиксу имени (для автодополнения).
+- **`src/Application/Service/NoteService`** — расширен:
+  - принимает `TagRepositoryInterface` третьим аргументом конструктора.
+  - метод `syncTags()` — синхронизация тегов при `create()`/`update()` (удаление, добавление новых).
+  - фильтрация `list()` по `tag_names[]` — AND-логика через `INNER JOIN` для каждого тега.
+  - EC-7: предварительная фильтрация неизвестных имён тегов перед запросом в репозиторий.
+- **Новые Action-контроллеры** (`src/Presentation/HTTP/`):
+
+  | Контроллер           | Маршрут                      |
+  |----------------------|------------------------------|
+  | `CreateTagAction`    | `POST /api/tags`             |
+  | `DeleteTagAction`    | `DELETE /api/tags/{id}`      |
+  | `ListTagsAction`     | `GET /api/tags`              |
+  | `SuggestTagsAction`  | `GET /api/tags/suggest?q=`   |
+
+- **`migrations/Version20260305000001`** — создание таблицы `tag` (UUID PK, VARCHAR 50 UNIQUE name, created_at, updated_at); создание JoinTable `note_tag` (ManyToMany связь Note↔Tag, ON DELETE CASCADE обе FK); добавление поля `tags` в Note.
+
+**Backend — тесты:**
+
+| Файл                                                | Тип         | Описание                                                                               |
+|-----------------------------------------------------|-------------|----------------------------------------------------------------------------------------|
+| `tests/Unit/Application/Service/TagServiceTest`     | Unit        | Создание, удаление, облако, поиск по префиксу — с моками репозитория                   |
+| `tests/Unit/Application/Service/NoteServiceTagTest` | Unit        | Синхронизация тегов при create/update, EC-7 фильтрация неизвестных — мокированные теги |
+| `tests/Integration/Action/TagActionsTest`           | Integration | POST /api/tags, DELETE /api/tags/{id}, GET /api/tags, GET /api/tags/suggest            |
+| `tests/Integration/Action/NoteTagFilterTest`        | Integration | GET /api/notes?tag_names[]=... (AND-фильтр), структура ответа с тегами                 |
+
+**Frontend — добавлено:**
+
+- **`src/stores/tags.ts`** (Pinia) — состояние облака тегов, выбранных тегов для фильтрации; actions: `fetchCloud`, `fetchSuggestions`, `createTag`, `deleteTag`, `selectTag`, `deselectTag`.
+- **`src/composables/useTags.ts`** — все HTTP-вызовы к `/api/tags` (GET cloud, POST, DELETE, GET suggest).
+- **Новые компоненты**:
+  - `TagCloud.vue` — облако тегов с кликабельными элементами, отображает количество заметок для каждого тега.
+  - `TagInput.vue` — поле ввода тегов с автодополнением (composable `useTagSuggestions`), теги отображаются как чипсы, есть возможность удалить через `×`.
+  - `NoteCard.vue` — расширена: отображает теги заметки как чипсы.
+- **`src/pages/NotesListPage.vue`** — расширена: отображает облако тегов, фильтрация заметок по выбранным тегам (AND-логика).
+- **`src/pages/NoteEditPage.vue`** — расширена: компонент `TagInput` для управления тегами заметки при create/edit.
+- **`src/stores/notes.ts`** — синхронизирован с выбранными тегами из `useTagsStore`.
+- **Новые пакеты**: нет новых пакетов (используются существующие).
+
+**Frontend — тесты:**
+
+| Файл                                            | Тип            | Описание                                       |
+|-------------------------------------------------|----------------|------------------------------------------------|
+| `src/components/__tests__/TagCloud.test.ts`     | Unit (Vitest)  | Рендеринг облака, клик на тег, работа с пустым |
+| `src/components/__tests__/TagInput.test.ts`     | Unit (Vitest)  | Добавление/удаление тегов, автодополнение      |
+
+**API — эндпоинты:**
+
+| Метод     | Путь                              | Действие                                |
+|-----------|-----------------------------------|-----------------------------------------|
+| `GET`     | `/api/tags`                       | Облако тегов (счётчик заметок)          |
+| `POST`    | `/api/tags`                       | Создание нового тега                    |
+| `DELETE`  | `/api/tags/{id}`                  | Удаление тега (каскадное из note_tag)   |
+| `GET`     | `/api/tags/suggest?q=<prefix>`    | Автодополнение (поиск по префиксу)      |
+| `GET`     | `/api/notes?tag_names[]=...[]=..` | Фильтр заметок по тегам (AND-логика)    |
+
+---
+
 ### [005] Notes Folders — 2026-03-04
 
 Реализована иерархическая система папок для заметок: самоссылочное дерево папок (до 5 уровней вложенности), привязка заметок к папкам, перемещение папок и заметок между папками.
@@ -184,21 +260,21 @@ GitHub Actions запускает при каждом Pull Request:
 - **`src/Application/Service/NoteService`** — расширен: принимает `FolderRepositoryInterface` вторым аргументом конструктора; поддерживает фильтрацию `list()` по `folder_id`, привязку папки при `create`/`update`, метод `moveToFolder()`.
 - **Новые Action-контроллеры** (`src/Presentation/HTTP/`):
 
-  | Контроллер | Маршрут |
-  |---|---|
-  | `CreateFolderAction` | `POST /api/folders` |
-  | `UpdateFolderAction` | `PUT /api/folders/{id}` |
-  | `DeleteFolderAction` | `DELETE /api/folders/{id}` |
-  | `GetFolderTreeAction` | `GET /api/folders/tree` |
-  | `MoveFolderAction` | `PUT /api/folders/{id}/move` |
-  | `MoveNoteToFolderAction` | `PUT /api/notes/{id}/move` |
+  | Контроллер               | Маршрут                      |
+  |--------------------------|------------------------------|
+  | `CreateFolderAction`     | `POST /api/folders`          |
+  | `UpdateFolderAction`     | `PUT /api/folders/{id}`      |
+  | `DeleteFolderAction`     | `DELETE /api/folders/{id}`   |
+  | `GetFolderTreeAction`    | `GET /api/folders/tree`      |
+  | `MoveFolderAction`       | `PUT /api/folders/{id}/move` |
+  | `MoveNoteToFolderAction` | `PUT /api/notes/{id}/move`   |
 
 - **`migrations/Version20260304000001`** — создание таблицы `folder`; `UNIQUE NULLS NOT DISTINCT (parent_id, name)` (PostgreSQL 15+, гарантирует уникальность имён внутри одного родителя, включая `NULL`-родителя); добавление `folder_id` в `note`; FK `ON DELETE RESTRICT` (папка) и `ON DELETE SET NULL` (заметка).
 
 **Backend — тесты:**
 
-| Файл | Тип | Описание |
-|------|-----|----------|
+| Файл                                               | Тип  | Описание                                                                                                     |
+|----------------------------------------------------|------|--------------------------------------------------------------------------------------------------------------|
 | `tests/Unit/Application/Service/FolderServiceTest` | Unit | Создание, переименование, удаление (со стратегиями), перемещение, ограничение глубины — с моками репозитория |
 
 **Frontend — добавлено:**
@@ -222,14 +298,14 @@ GitHub Actions запускает при каждом Pull Request:
 
 **API — добавленные эндпоинты:**
 
-| Метод | Путь | Действие |
-|-------|------|----------|
-| `GET` | `/api/folders/tree` | Дерево папок |
-| `POST` | `/api/folders` | Создание папки |
-| `PUT` | `/api/folders/{id}` | Переименование папки |
-| `DELETE` | `/api/folders/{id}[?strategy=reassign\|remove]` | Удаление папки |
-| `PUT` | `/api/folders/{id}/move` | Перемещение папки |
-| `PUT` | `/api/notes/{id}/move` | Перемещение заметки в папку |
+| Метод    | Путь                                            | Действие                    |
+|----------|-------------------------------------------------|-----------------------------|
+| `GET`    | `/api/folders/tree`                             | Дерево папок                |
+| `POST`   | `/api/folders`                                  | Создание папки              |
+| `PUT`    | `/api/folders/{id}`                             | Переименование папки        |
+| `DELETE` | `/api/folders/{id}[?strategy=reassign\|remove]` | Удаление папки              |
+| `PUT`    | `/api/folders/{id}/move`                        | Перемещение папки           |
+| `PUT`    | `/api/notes/{id}/move`                          | Перемещение заметки в папку |
 
 ---
 
@@ -255,12 +331,12 @@ GitHub Actions запускает при каждом Pull Request:
 
 **Backend — тесты:**
 
-| Файл | Тип | Описание |
-|------|-----|----------|
-| `tests/Unit/Application/Service/NoteServiceCreateTest` | Unit | Создание заметки, мок репозитория |
-| `tests/Unit/Application/Service/NoteServiceUpdateTest` | Unit | Обновление заметки, 404 при отсутствии |
-| `tests/Integration/Presentation/HTTP/ListNotesActionTest` | Integration | GET /api/notes, пагинация, структура ответа |
-| `tests/Integration/Presentation/HTTP/ApiDocAvailabilityTest` | Integration (smoke) | Доступность Swagger UI |
+| Файл                                                         | Тип                 | Описание                                    |
+|--------------------------------------------------------------|---------------------|---------------------------------------------|
+| `tests/Unit/Application/Service/NoteServiceCreateTest`       | Unit                | Создание заметки, мок репозитория           |
+| `tests/Unit/Application/Service/NoteServiceUpdateTest`       | Unit                | Обновление заметки, 404 при отсутствии      |
+| `tests/Integration/Presentation/HTTP/ListNotesActionTest`    | Integration         | GET /api/notes, пагинация, структура ответа |
+| `tests/Integration/Presentation/HTTP/ApiDocAvailabilityTest` | Integration (smoke) | Доступность Swagger UI                      |
 
 **Frontend — добавлено:**
 
@@ -269,12 +345,12 @@ GitHub Actions запускает при каждом Pull Request:
 - **`src/composables/useMarkdown.ts`** — рендеринг Markdown через `marked` + санитизация `DOMPurify`.
 - **Новые страницы** (роуты Vue Router):
 
-  | Маршрут | Страница | Назначение |
-  |---------|----------|------------|
-  | `/notes` | `NotesListPage` | Список заметок с пагинацией |
-  | `/notes/new` | `NoteEditPage` | Создание заметки |
-  | `/notes/:id` | `NoteViewPage` | Просмотр с Markdown-рендерингом |
-  | `/notes/:id/edit` | `NoteEditPage` | Редактирование заметки |
+  | Маршрут           | Страница        | Назначение                      |
+  |-------------------|-----------------|---------------------------------|
+  | `/notes`          | `NotesListPage` | Список заметок с пагинацией     |
+  | `/notes/new`      | `NoteEditPage`  | Создание заметки                |
+  | `/notes/:id`      | `NoteViewPage`  | Просмотр с Markdown-рендерингом |
+  | `/notes/:id/edit` | `NoteEditPage`  | Редактирование заметки          |
 
 - **Новые компоненты**:
   - `MarkdownEditor.vue` — textarea с живым предпросмотром Markdown (split-view).
@@ -287,8 +363,8 @@ GitHub Actions запускает при каждом Pull Request:
 
 **Frontend — тесты:**
 
-| Файл | Тип | Описание |
-|------|-----|----------|
+| Файл                                  | Тип           | Описание                            |
+|---------------------------------------|---------------|-------------------------------------|
 | `src/composables/useMarkdown.test.ts` | Unit (Vitest) | Рендеринг Markdown, санитизация XSS |
 
 **Инфраструктура:**
@@ -297,14 +373,14 @@ GitHub Actions запускает при каждом Pull Request:
 
 **API — эндпоинты:**
 
-| Метод | Путь | Действие |
-|-------|------|----------|
-| `GET` | `/api/notes` | Список заметок (пагинация: `?page=1`) |
-| `POST` | `/api/notes` | Создание заметки |
-| `GET` | `/api/notes/{id}` | Получение заметки по UUID |
-| `PUT` | `/api/notes/{id}` | Обновление заметки |
-| `DELETE` | `/api/notes/{id}` | Удаление заметки |
-| `GET` | `/api/doc` | Swagger UI (NelmioApiDoc) |
+| Метод    | Путь              | Действие                              |
+|----------|-------------------|---------------------------------------|
+| `GET`    | `/api/notes`      | Список заметок (пагинация: `?page=1`) |
+| `POST`   | `/api/notes`      | Создание заметки                      |
+| `GET`    | `/api/notes/{id}` | Получение заметки по UUID             |
+| `PUT`    | `/api/notes/{id}` | Обновление заметки                    |
+| `DELETE` | `/api/notes/{id}` | Удаление заметки                      |
+| `GET`    | `/api/doc`        | Swagger UI (NelmioApiDoc)             |
 
 ---
 

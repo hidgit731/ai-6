@@ -1,9 +1,12 @@
+import type { Tag } from '@/composables/useTags'
+
 export interface NoteListItem {
     id: string
     title: string
     preview: string | null
     createdAt: string
     folderId: string | null
+    tags: Tag[]
 }
 
 export interface Note {
@@ -14,6 +17,7 @@ export interface Note {
     updatedAt: string
     folderId: string | null
     folderName: string | null
+    tags: Tag[]
 }
 
 export interface PaginatedNotes {
@@ -28,21 +32,28 @@ export interface CreateNotePayload {
     title: string
     content: string | null
     folderId?: string | null
+    tags?: string[]
 }
 
 export interface UpdateNotePayload {
     title: string
     content: string | null
     folderId?: string | null
+    tags?: string[]
 }
 
 const API_BASE = import.meta.env.VITE_API_URL ?? '/api'
 
 export function useNotes() {
-    async function list(page = 1, folderId?: string | null): Promise<PaginatedNotes> {
+    async function list(page = 1, folderId?: string | null, tagNames?: string[]): Promise<PaginatedNotes> {
         let url = `${API_BASE}/notes?page=${page}`
         if (folderId !== undefined) {
             url += `&folderId=${folderId ?? ''}`
+        }
+        if (tagNames && tagNames.length > 0) {
+            for (const name of tagNames) {
+                url += `&tags[]=${encodeURIComponent(name)}`
+            }
         }
         const res = await fetch(url)
         if (!res.ok) throw new Error('Ошибка загрузки заметок')

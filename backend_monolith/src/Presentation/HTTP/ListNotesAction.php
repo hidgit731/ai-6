@@ -44,8 +44,9 @@ class ListNotesAction
         $folderId = $request->query->has('folderId')
             ? ($request->query->get('folderId') ?: null)
             : null;
+        $tags = $request->query->all('tags') ?: [];
 
-        $dto = new ListNotesRequest(page: $page, folderId: $folderId);
+        $dto = new ListNotesRequest(page: $page, folderId: $folderId, tags: array_filter(array_map('strval', $tags)));
 
         $violations = $this->validator->validate($dto);
         if (\count($violations) > 0) {

@@ -11,9 +11,12 @@ use App\Application\DTO\Request\UpdateNoteRequest;
 use App\Application\DTO\Response\NoteListItemResponse;
 use App\Application\DTO\Response\NoteResponse;
 use App\Application\DTO\Response\PaginatedNotesResponse;
+use App\Application\DTO\Response\TagResponse;
 use App\Domain\Entity\Note;
+use App\Domain\Entity\Tag;
 use App\Domain\Repository\FolderRepositoryInterface;
 use App\Domain\Repository\NoteRepositoryInterface;
+use App\Domain\Repository\TagRepositoryInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Uid\Uuid;
 
@@ -24,6 +27,7 @@ class NoteService
     public function __construct(
         private readonly NoteRepositoryInterface $noteRepository,
         private readonly FolderRepositoryInterface $folderRepository,
+        private readonly TagRepositoryInterface $tagRepository,
     ) {
     }
 
@@ -39,6 +43,7 @@ class NoteService
             $note->setFolder($folder);
         }
 
+        $this->syncTags($note, $request->tags);
         $this->noteRepository->save($note);
 
         return $this->toResponse($note);
@@ -67,6 +72,7 @@ class NoteService
             }
         }
 
+        $this->syncTags($note, $request->tags);
         $this->noteRepository->save($note);
 
         return $this->toResponse($note);
@@ -96,9 +102,17 @@ class NoteService
 
     public function list(ListNotesRequest $request): PaginatedNotesResponse
     {
-        $result = null !== $request->folderId
-            ? $this->noteRepository->findByFolderIdPaginated($request->folderId, $request->page, self::PER_PAGE)
-            : $this->noteRepository->findPaginated($request->page, self::PER_PAGE);
+        $validNames = array_values(array_filter(
+            $request->tags,
+            fn (string $n) => null !== $this->tagRepository->findByName($n),
+        ));
+
+        $result = $this->noteRepository->findFilteredPaginated(
+            $request->folderId,
+            $validNames,
+            $request->page,
+            self::PER_PAGE,
+        );
 
         $items = array_map(
             fn (Note $note) => $this->toListItemResponse($note),
@@ -148,6 +162,10 @@ class NoteService
             updatedAt: $note->getUpdatedAt()->format(\DateTimeInterface::ATOM),
             folderId: $note->getFolderId(),
             folderName: $note->getFolder()?->getName(),
+            tags: array_map(
+                static fn (Tag $t) => TagResponse::fromEntity($t),
+                $note->getTags()->toArray(),
+            ),
         );
     }
 
@@ -159,7 +177,27 @@ class NoteService
             preview: $this->generatePreview($note->getContent()),
             createdAt: $note->getCreatedAt()->format(\DateTimeInterface::ATOM),
             folderId: $note->getFolderId(),
+            tags: array_map(
+                static fn (Tag $t) => TagResponse::fromEntity($t),
+                $note->getTags()->toArray(),
+            ),
         );
+    }
+
+    /**
+     * @param string[] $tagNames
+     */
+    private function syncTags(Note $note, array $tagNames): void
+    {
+        $note->clearTags();
+        foreach ($tagNames as $name) {
+            $tag = $this->tagRepository->findByName($name);
+            if (null === $tag) {
+                $tag = new Tag($name);
+                $this->tagRepository->save($tag);
+            }
+            $note->addTag($tag);
+        }
     }
 
     private function generatePreview(?string $content): ?string

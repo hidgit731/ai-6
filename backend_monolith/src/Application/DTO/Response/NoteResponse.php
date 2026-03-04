@@ -14,6 +14,7 @@ class NoteResponse
         public readonly string $updatedAt,
         public readonly ?string $folderId = null,
         public readonly ?string $folderName = null,
+        public readonly array $tags = [],
     ) {
     }
 }

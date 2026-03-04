@@ -80,6 +80,44 @@ class DoctrineNoteRepository implements NoteRepositoryInterface
         return (int) $qb->getQuery()->getSingleScalarResult();
     }
 
+    public function findFilteredPaginated(?string $folderId, array $tagNames, int $page, int $perPage): array
+    {
+        $qb = $this->entityManager->createQueryBuilder()
+            ->select('n')
+            ->from(Note::class, 'n')
+            ->orderBy('n.createdAt', 'DESC');
+
+        foreach ($tagNames as $i => $name) {
+            $qb->innerJoin('n.tags', "t{$i}")
+               ->andWhere("t{$i}.name = :name{$i}")
+               ->setParameter("name{$i}", $name);
+        }
+
+        $this->applyFolderFilter($qb, $folderId);
+
+        $countQb = $this->entityManager->createQueryBuilder()
+            ->select('COUNT(DISTINCT n.id)')
+            ->from(Note::class, 'n');
+
+        foreach ($tagNames as $i => $name) {
+            $countQb->innerJoin('n.tags', "t{$i}")
+                    ->andWhere("t{$i}.name = :name{$i}")
+                    ->setParameter("name{$i}", $name);
+        }
+
+        $this->applyFolderFilter($countQb, $folderId);
+
+        $total = (int) $countQb->getQuery()->getSingleScalarResult();
+
+        $items = $qb
+            ->setFirstResult(($page - 1) * $perPage)
+            ->setMaxResults($perPage)
+            ->getQuery()
+            ->getResult();
+
+        return ['items' => $items, 'total' => $total];
+    }
+
     public function save(Note $note): void
     {
         $this->entityManager->persist($note);

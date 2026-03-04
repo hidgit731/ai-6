@@ -10,6 +10,7 @@ use App\Application\Service\NoteService;
 use App\Domain\Entity\Note;
 use App\Domain\Repository\FolderRepositoryInterface;
 use App\Domain\Repository\NoteRepositoryInterface;
+use App\Domain\Repository\TagRepositoryInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -23,7 +24,11 @@ class NoteServiceCreateTest extends TestCase
     {
         $this->repository = $this->createMock(NoteRepositoryInterface::class);
         $this->folderRepository = $this->createMock(FolderRepositoryInterface::class);
-        $this->service = new NoteService($this->repository, $this->folderRepository);
+        $this->service = new NoteService(
+            $this->repository,
+            $this->folderRepository,
+            $this->createMock(TagRepositoryInterface::class),
+        );
     }
 
     public function testCreateWithValidDataReturnsNoteResponse(): void

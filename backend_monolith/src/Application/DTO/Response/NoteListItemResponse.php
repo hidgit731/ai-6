@@ -12,6 +12,7 @@ class NoteListItemResponse
         public readonly ?string $preview,
         public readonly string $createdAt,
         public readonly ?string $folderId = null,
+        public readonly array $tags = [],
     ) {
     }
 }

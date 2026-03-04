@@ -15,6 +15,7 @@ class CreateNoteRequest
         public readonly ?string $content = null,
         #[Assert\Uuid(versions: [Assert\Uuid::V4_RANDOM, Assert\Uuid::V7_MONOTONIC])]
         public readonly ?string $folderId = null,
+        public readonly array $tags = [],
     ) {
     }
 }

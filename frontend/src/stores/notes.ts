@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import { useNotes } from '@/composables/useNotes'
 import { useFoldersStore } from '@/stores/folders'
+import { useTagsStore } from '@/stores/tags'
 import type { Note, NoteListItem, PaginatedNotes, CreateNotePayload, UpdateNotePayload } from '@/composables/useNotes'
 
 export const useNotesStore = defineStore('notes', () => {
@@ -19,9 +20,15 @@ export const useNotesStore = defineStore('notes', () => {
     const error = ref<string | null>(null)
 
     const foldersStore = useFoldersStore()
+    const tagsStore = useTagsStore()
 
     watch(
         () => foldersStore.selectedFolderId,
+        () => fetchList(1)
+    )
+
+    watch(
+        () => tagsStore.selectedTagNames,
         () => fetchList(1)
     )
 
@@ -30,7 +37,8 @@ export const useNotesStore = defineStore('notes', () => {
         error.value = null
         try {
             const folderId = foldersStore.selectedFolderId
-            const data = await notesApi.list(page, folderId !== null ? folderId : undefined)
+            const tagNames = tagsStore.selectedTagNames.length > 0 ? tagsStore.selectedTagNames : undefined
+            const data = await notesApi.list(page, folderId !== null ? folderId : undefined, tagNames)
             notes.value = data.items
             pagination.value = {
                 page: data.page,
