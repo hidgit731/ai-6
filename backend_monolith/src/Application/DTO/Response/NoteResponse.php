@@ -15,6 +15,8 @@ class NoteResponse
         public readonly ?string $folderId = null,
         public readonly ?string $folderName = null,
         public readonly array $tags = [],
+        public readonly bool $isFavorite = false,
+        public readonly ?string $deletedAt = null,
     ) {
     }
 }

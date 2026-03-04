@@ -25,6 +25,16 @@ async function handleMoveConfirm(folderId: string | null): Promise<void> {
     showMoveModal.value = false
     await notesStore.moveNote(props.note.id, folderId)
 }
+
+async function handleToggleFavorite(event: Event): Promise<void> {
+    event.stopPropagation()
+    await notesStore.toggleFavorite(props.note.id)
+}
+
+async function handleDeleteNote(event: Event): Promise<void> {
+    event.stopPropagation()
+    await notesStore.softDeleteNote(props.note.id)
+}
 </script>
 
 <template>
@@ -36,14 +46,32 @@ async function handleMoveConfirm(folderId: string | null): Promise<void> {
             <span v-for="tag in props.note.tags" :key="tag.id" class="note-tag-badge">{{ tag.name }}</span>
         </div>
         <div class="note-card__footer">
-            <span v-if="props.note.folderId" class="note-folder-badge">📁</span>
-            <button
-                class="note-card__move-btn"
-                title="Переместить в папку"
-                @click.stop="showMoveModal = true"
-            >
-                Переместить
-            </button>
+            <div class="note-card__left">
+                <span v-if="props.note.folderId" class="note-folder-badge">📁</span>
+            </div>
+            <div class="note-card__actions">
+                <button
+                    class="note-card__btn"
+                    :title="props.note.isFavorite ? 'Убрать из избранного' : 'Добавить в избранное'"
+                    @click="handleToggleFavorite"
+                >
+                    {{ props.note.isFavorite ? '★' : '☆' }}
+                </button>
+                <button
+                    class="note-card__btn"
+                    title="Удалить"
+                    @click="handleDeleteNote"
+                >
+                    🗑️
+                </button>
+                <button
+                    class="note-card__move-btn"
+                    title="Переместить в папку"
+                    @click.stop="showMoveModal = true"
+                >
+                    Переместить
+                </button>
+            </div>
         </div>
     </div>
 
@@ -101,12 +129,39 @@ async function handleMoveConfirm(folderId: string | null): Promise<void> {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-top: 0.25rem;
+    margin-top: 0.75rem;
+    gap: 0.5rem;
+}
+
+.note-card__left {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
 }
 
 .note-folder-badge {
     font-size: 0.8rem;
     color: #4a90d9;
+}
+
+.note-card__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.note-card__btn {
+    background: none;
+    border: none;
+    font-size: 0.9rem;
+    cursor: pointer;
+    padding: 0.2rem 0.4rem;
+    border-radius: 3px;
+    transition: background 0.15s;
+}
+
+.note-card__btn:hover {
+    background: #f0f0f0;
 }
 
 .note-card__move-btn {
@@ -117,6 +172,7 @@ async function handleMoveConfirm(folderId: string | null): Promise<void> {
     cursor: pointer;
     padding: 0.1rem 0.3rem;
     border-radius: 3px;
+    transition: background 0.15s;
 }
 
 .note-card__move-btn:hover {

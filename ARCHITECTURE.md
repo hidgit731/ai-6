@@ -164,6 +164,88 @@ GitHub Actions запускает при каждом Pull Request:
 
 ## Changelog
 
+### [007] Favorites & Trash System — 2026-03-05
+
+Реализована система избранного и удаления заметок в корзину: возможность отмечать заметки как избранные, мягкое удаление заметок (с отправкой в корзину), восстановление из корзины, постоянное удаление, автоматическая очистка старых данных из корзины.
+
+**Backend — добавлено:**
+
+- **`src/Domain/Entity/Note`** — добавлены поля `is_favorite` (BOOLEAN DEFAULT false) и `deleted_at` (DATETIME nullable). Индекс по `deleted_at`.
+- **`src/Domain/Repository/NoteRepositoryInterface`** — расширен: `findPaginatedFavorites`, `findPaginatedTrash`, `findByIdWithDeleted` (игнорирует мягкое удаление для восстановления).
+- **`src/Infrastructure/Persistence/Repository/DoctrineNoteRepository`** — реализация новых методов:
+  - `findPaginatedFavorites()` — поиск избранных заметок (исключает удалённые).
+  - `findPaginatedTrash()` — поиск удалённых заметок (WHERE deleted_at IS NOT NULL).
+  - `findByIdWithDeleted()` — поиск заметки по ID без фильтрации по deleted_at (для восстановления).
+- **`src/Application/DTO/Request/`** — `FavoriteToggleRequest`, `RestoreNoteRequest`; расширены `CreateNoteRequest`, `UpdateNoteRequest`, `ListNotesRequest` (поле `favorite`, `include_trash`).
+- **`src/Application/DTO/Response/`** — расширены `NoteResponse`, `NoteListItemResponse` (поля `is_favorite`, `deleted_at`).
+- **`src/Application/Service/NoteService`** — расширен:
+  - метод `toggleFavorite(id)` — переключение состояния избранного.
+  - метод `softDelete(id)` — мягкое удаление (установка deleted_at = NOW()).
+  - метод `restore(id)` — восстановление из корзины (очистка deleted_at).
+  - метод `permanentDelete(id)` — постоянное удаление из БД.
+  - `list()` автоматически исключает удалённые заметки (WHERE deleted_at IS NULL).
+- **Новые Action-контроллеры** (`src/Presentation/HTTP/`):
+
+  | Контроллер                  | Маршрут                            |
+  |-----------------------------|------------------------------------|
+  | `ToggleFavoriteAction`      | `POST /api/notes/{id}/favorite`    |
+  | `GetFavoritesAction`        | `GET /api/notes/favorites`         |
+  | `GetTrashAction`            | `GET /api/notes/trash`             |
+  | `RestoreNoteAction`         | `PUT /api/notes/{id}/restore`      |
+  | `PermanentDeleteNoteAction` | `DELETE /api/notes/{id}/permanent` |
+
+- **`src/Presentation/Console/CleanupTrashCommand`** — консольная команда для удаления заметок из корзины старше 30 дней (можно запускать по cron).
+- **`migrations/Version20260305000002`** — добавление полей `is_favorite` (BOOLEAN DEFAULT false) и `deleted_at` (DATETIME nullable) в таблицу `note`; индекс по `deleted_at`.
+
+**Backend — тесты:**
+
+| Файл                                                           | Тип          | Описание                                                                    |
+|----------------------------------------------------------------|--------------|-----------------------------------------------------------------------------|
+| `tests/Unit/Application/Service/NoteServiceFavoritesTest`      | Unit         | Переключение избранного, проверка state — мокированные                      |
+| `tests/Unit/Application/Service/NoteServiceTrashTest`          | Unit         | Мягкое удаление, восстановление, очистка корзины                            |
+| `tests/Integration/Action/FavoritesActionsTest`                | Integration  | POST /api/notes/{id}/favorite, GET /api/notes/favorites                     |
+| `tests/Integration/Action/TrashActionsTest`                    | Integration  | DELETE /api/notes/{id}, GET /api/notes/trash, PUT restore, DELETE permanent |
+
+**Frontend — добавлено:**
+
+- **`src/pages/FavoritesPage.vue`** — страница избранных заметок с пагинацией, кнопка удаления из избранного.
+- **`src/pages/TrashPage.vue`** — страница корзины с пагинацией, кнопки восстановления и постоянного удаления.
+- **`src/router/index.ts`** — добавлены маршруты `/favorites` и `/trash`.
+- **`src/composables/useNotes.ts`** — расширен: новые методы `toggleFavorite(id)`, `softDelete(id)`, `restoreNote(id)`, `permanentDelete(id)`, `fetchFavorites(page)`, `fetchTrash(page)`.
+- **`src/stores/notes.ts`** (Pinia) — расширен: действия `toggleFavorite`, `softDelete`, `restoreNote`, `permanentDelete`, `fetchFavorites`, `fetchTrash`; состояние `favoritesList`, `trashList`, `favoritesPagination`, `trashPagination`.
+- **`src/components/NoteCard.vue`** — расширен:
+  - иконка звезды для переключения избранного (с визуальной обратной связью).
+  - отображение статуса удаления (бэйдж "В корзине" для заметок из trash).
+  - контекстное меню: действия в зависимости от страницы (Favorites → удалить, Trash → восстановить/удалить).
+- **`src/components/FolderTree.vue`** — добавлены разделители для выделения специальных разделов (Favorites, Trash).
+- **Новые пакеты**: нет новых пакетов.
+
+**Frontend — тесты:**
+
+| Файл                                            | Тип            | Описание                                       |
+|-------------------------------------------------|----------------|------------------------------------------------|
+| `src/pages/__tests__/FavoritesPage.test.ts`     | Unit (Vitest)  | Рендеринг, пагинация, удаление из избранного   |
+| `src/pages/__tests__/TrashPage.test.ts`         | Unit (Vitest)  | Рендеринг, восстановление, постоянное удаление |
+
+**API — новые эндпоинты:**
+
+| Метод    | Путь                           | Действие                            |
+|----------|--------------------------------|-------------------------------------|
+| `POST`   | `/api/notes/{id}/favorite`     | Переключить избранное               |
+| `GET`    | `/api/notes/favorites`         | Список избранных (пагинация)        |
+| `DELETE` | `/api/notes/{id}`              | Мягкое удаление (в корзину)         |
+| `GET`    | `/api/notes/trash`             | Список в корзине (пагинация)        |
+| `PUT`    | `/api/notes/{id}/restore`      | Восстановить из корзины             |
+| `DELETE` | `/api/notes/{id}/permanent`    | Постоянное удаление из БД           |
+
+**CLI команды:**
+
+| Команда                                         | Действие                                 |
+|-------------------------------------------------|------------------------------------------|
+| `php bin/console app:cleanup-trash [--days=30]` | Удалить заметки старше N дней из корзины |
+
+---
+
 ### [006] Tags System — 2026-03-05
 
 Реализована система тегирования заметок: поддержка создания и удаления тегов, привязка множественных тегов к заметкам, фильтрация заметок по тегам, облако тегов с подсчётом количества заметок.

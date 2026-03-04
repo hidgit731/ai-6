@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import FolderTreeNode from './FolderTreeNode.vue'
 import FolderContextMenu from './FolderContextMenu.vue'
 import MoveFolderModal from './MoveFolderModal.vue'
@@ -7,6 +8,7 @@ import SkeletonList from './SkeletonList.vue'
 import { useFoldersStore } from '@/stores/folders'
 import { useToast } from '@/composables/useToast'
 
+const router = useRouter()
 const foldersStore = useFoldersStore()
 const { addToast } = useToast()
 
@@ -62,6 +64,14 @@ async function handleCreateFolder(): Promise<void> {
         addToast(msg, 'error')
     }
 }
+
+function handleSelectFolder(folderId: string): void {
+    foldersStore.selectFolder(folderId)
+    // If we're on favorites or trash, go back to the main notes list
+    if (router.currentRoute.value.name === 'favorites' || router.currentRoute.value.name === 'trash') {
+        router.push({ name: 'notes-list' })
+    }
+}
 </script>
 
 <template>
@@ -71,17 +81,32 @@ async function handleCreateFolder(): Promise<void> {
         <ul class="folder-tree__list">
             <li
                 class="folder-tree__all"
-                :class="{ 'folder-tree__all--active': foldersStore.selectedFolderId === null }"
-                @click="foldersStore.selectFolder(null)"
+                :class="{ 'folder-tree__all--active': foldersStore.selectedFolderId === null && router.currentRoute.value.name === 'notes-list' }"
+                @click="foldersStore.selectFolder(null); router.push({ name: 'notes-list' })"
             >
                 Все заметки
             </li>
             <li
                 class="folder-tree__all"
-                :class="{ 'folder-tree__all--active': foldersStore.selectedFolderId === 'none' }"
-                @click="foldersStore.selectFolder('none')"
+                :class="{ 'folder-tree__all--active': foldersStore.selectedFolderId === 'none' && router.currentRoute.value.name === 'notes-list' }"
+                @click="foldersStore.selectFolder('none'); router.push({ name: 'notes-list' })"
             >
                 Без папки
+            </li>
+            <li class="folder-tree__separator" />
+            <li
+                class="folder-tree__all"
+                :class="{ 'folder-tree__all--active': router.currentRoute.value.name === 'favorites' }"
+                @click="foldersStore.selectFolder(null); router.push({ name: 'favorites' })"
+            >
+                ★ Избранное
+            </li>
+            <li
+                class="folder-tree__all"
+                :class="{ 'folder-tree__all--active': router.currentRoute.value.name === 'trash' }"
+                @click="foldersStore.selectFolder(null); router.push({ name: 'trash' })"
+            >
+                🗑️ Корзина
             </li>
         </ul>
 
@@ -99,7 +124,7 @@ async function handleCreateFolder(): Promise<void> {
                 :folder="node"
                 :is-expanded="foldersStore.isExpanded(node.id)"
                 :is-selected="foldersStore.selectedFolderId === node.id"
-                @select="foldersStore.selectFolder($event)"
+                @select="handleSelectFolder($event)"
                 @toggle="foldersStore.toggleExpanded($event)"
                 @context-menu="openContextMenu"
             />
@@ -204,5 +229,12 @@ async function handleCreateFolder(): Promise<void> {
 .folder-tree__create:hover {
     border-color: #4a90d9;
     color: #4a90d9;
+}
+
+.folder-tree__separator {
+    height: 1px;
+    background: #e8e8e8;
+    margin: 0.5rem 0;
+    list-style: none;
 }
 </style>

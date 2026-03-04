@@ -19,6 +19,18 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/NoteEditPage.vue'),
     },
     {
+        // IMPORTANT: /notes/favorites MUST be declared before /notes/:id
+        path: '/notes/favorites',
+        name: 'favorites',
+        component: () => import('@/pages/FavoritesPage.vue'),
+    },
+    {
+        // IMPORTANT: /notes/trash MUST be declared before /notes/:id
+        path: '/notes/trash',
+        name: 'trash',
+        component: () => import('@/pages/TrashPage.vue'),
+    },
+    {
         path: '/notes/:id',
         name: 'note-view',
         component: () => import('@/pages/NoteViewPage.vue'),

@@ -36,4 +36,16 @@ interface NoteRepositoryInterface
     public function save(Note $note): void;
 
     public function delete(Note $note): void;
+
+    /**
+     * @return array{items: Note[], total: int, pages: int, page: int, limit: int}
+     */
+    public function findFavorites(int $page = 1, int $limit = 20): array;
+
+    /**
+     * @return array{items: Note[], total: int, pages: int, page: int, limit: int}
+     */
+    public function findTrash(int $page = 1, int $limit = 20): array;
+
+    public function deleteExpiredTrash(\DateTimeImmutable $before): int;
 }

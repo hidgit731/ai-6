@@ -16,7 +16,7 @@ use Symfony\Component\Uid\Uuid;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 #[AsController]
-#[Route('/api/notes/{id}/folder', methods: ['PATCH'])]
+#[Route('/api/notes/{id}/folder', methods: ['PATCH'], requirements: ['id' => '[0-9a-f\-]++'])]
 class MoveNoteToFolderAction
 {
     public function __construct(

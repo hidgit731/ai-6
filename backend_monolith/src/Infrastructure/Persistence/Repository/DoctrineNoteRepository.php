@@ -25,12 +25,14 @@ class DoctrineNoteRepository implements NoteRepositoryInterface
         $qb = $this->entityManager->createQueryBuilder();
         $qb->select('n')
             ->from(Note::class, 'n')
+            ->where('n.deletedAt IS NULL')
             ->orderBy('n.createdAt', 'DESC');
 
         $countQb = $this->entityManager->createQueryBuilder();
         $total = (int) $countQb
             ->select('COUNT(n.id)')
             ->from(Note::class, 'n')
+            ->where('n.deletedAt IS NULL')
             ->getQuery()
             ->getSingleScalarResult();
 
@@ -48,13 +50,15 @@ class DoctrineNoteRepository implements NoteRepositoryInterface
         $qb = $this->entityManager->createQueryBuilder()
             ->select('n')
             ->from(Note::class, 'n')
+            ->where('n.deletedAt IS NULL')
             ->orderBy('n.createdAt', 'DESC');
 
         $this->applyFolderFilter($qb, $folderId);
 
         $countQb = $this->entityManager->createQueryBuilder()
             ->select('COUNT(n.id)')
-            ->from(Note::class, 'n');
+            ->from(Note::class, 'n')
+            ->where('n.deletedAt IS NULL');
 
         $this->applyFolderFilter($countQb, $folderId);
 
@@ -85,6 +89,7 @@ class DoctrineNoteRepository implements NoteRepositoryInterface
         $qb = $this->entityManager->createQueryBuilder()
             ->select('n')
             ->from(Note::class, 'n')
+            ->where('n.deletedAt IS NULL')
             ->orderBy('n.createdAt', 'DESC');
 
         foreach ($tagNames as $i => $name) {
@@ -97,7 +102,8 @@ class DoctrineNoteRepository implements NoteRepositoryInterface
 
         $countQb = $this->entityManager->createQueryBuilder()
             ->select('COUNT(DISTINCT n.id)')
-            ->from(Note::class, 'n');
+            ->from(Note::class, 'n')
+            ->where('n.deletedAt IS NULL');
 
         foreach ($tagNames as $i => $name) {
             $countQb->innerJoin('n.tags', "t{$i}")
@@ -128,6 +134,73 @@ class DoctrineNoteRepository implements NoteRepositoryInterface
     {
         $this->entityManager->remove($note);
         $this->entityManager->flush();
+    }
+
+    public function findFavorites(int $page = 1, int $limit = 20): array
+    {
+        $qb = $this->entityManager->createQueryBuilder()
+            ->select('n')
+            ->from(Note::class, 'n')
+            ->where('n.isFavorite = true')
+            ->andWhere('n.deletedAt IS NULL')
+            ->orderBy('n.createdAt', 'DESC');
+
+        $countQb = $this->entityManager->createQueryBuilder()
+            ->select('COUNT(n.id)')
+            ->from(Note::class, 'n')
+            ->where('n.isFavorite = true')
+            ->andWhere('n.deletedAt IS NULL');
+
+        $total = (int) $countQb->getQuery()->getSingleScalarResult();
+
+        $items = $qb
+            ->setFirstResult(($page - 1) * $limit)
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+
+        $pages = (int) ceil($total / $limit);
+
+        return ['items' => $items, 'total' => $total, 'pages' => $pages, 'page' => $page, 'limit' => $limit];
+    }
+
+    public function findTrash(int $page = 1, int $limit = 20): array
+    {
+        $qb = $this->entityManager->createQueryBuilder()
+            ->select('n')
+            ->from(Note::class, 'n')
+            ->where('n.deletedAt IS NOT NULL')
+            ->orderBy('n.deletedAt', 'DESC');
+
+        $countQb = $this->entityManager->createQueryBuilder()
+            ->select('COUNT(n.id)')
+            ->from(Note::class, 'n')
+            ->where('n.deletedAt IS NOT NULL');
+
+        $total = (int) $countQb->getQuery()->getSingleScalarResult();
+
+        $items = $qb
+            ->setFirstResult(($page - 1) * $limit)
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+
+        $pages = (int) ceil($total / $limit);
+
+        return ['items' => $items, 'total' => $total, 'pages' => $pages, 'page' => $page, 'limit' => $limit];
+    }
+
+    public function deleteExpiredTrash(\DateTimeImmutable $before): int
+    {
+        $qb = $this->entityManager->createQueryBuilder()
+            ->delete(Note::class, 'n')
+            ->where('n.deleted_at IS NOT NULL')
+            ->andWhere('n.deleted_at < :before')
+            ->andWhere('n.updated_at < :grace_period')
+            ->setParameter('before', $before)
+            ->setParameter('grace_period', new \DateTimeImmutable('now - 5 seconds'));
+
+        return $qb->getQuery()->executeStatement();
     }
 
     private function applyFolderFilter(\Doctrine\ORM\QueryBuilder $qb, ?string $folderId): void

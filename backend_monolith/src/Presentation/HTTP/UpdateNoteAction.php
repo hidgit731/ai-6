@@ -17,7 +17,7 @@ use Symfony\Component\Uid\Uuid;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 #[AsController]
-#[Route('/api/notes/{id}', methods: ['PUT'])]
+#[Route('/api/notes/{id}', methods: ['PUT'], requirements: ['id' => '[0-9a-f\-]++'])]
 #[OA\Put(
     path: '/api/notes/{id}',
     summary: 'Обновление заметки',

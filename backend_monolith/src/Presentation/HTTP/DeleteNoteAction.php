@@ -14,7 +14,7 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Uid\Uuid;
 
 #[AsController]
-#[Route('/api/notes/{id}', methods: ['DELETE'])]
+#[Route('/api/notes/{id}', methods: ['DELETE'], requirements: ['id' => '[0-9a-f\-]++'])]
 #[OA\Delete(
     path: '/api/notes/{id}',
     summary: 'Удаление заметки',
@@ -44,6 +44,8 @@ class DeleteNoteAction
             $this->noteService->delete($uuid);
         } catch (NotFoundHttpException $e) {
             return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_NOT_FOUND);
+        } catch (\DomainException $e) {
+            return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_CONFLICT);
         }
 
         return new Response(null, Response::HTTP_NO_CONTENT);

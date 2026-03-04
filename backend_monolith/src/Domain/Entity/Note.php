@@ -43,12 +43,20 @@ class Note
     #[ORM\JoinTable(name: 'note_tag')]
     private Collection $tags;
 
+    #[ORM\Column(type: 'boolean', options: ['default' => false])]
+    private bool $isFavorite = false;
+
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $deletedAt = null;
+
     public function __construct(string $title, ?string $content = null)
     {
         $this->id = Uuid::v7();
         $this->title = $title;
         $this->content = $content;
         $this->tags = new ArrayCollection();
+        $this->isFavorite = false;
+        $this->deletedAt = null;
     }
 
     public function getId(): Uuid
@@ -116,5 +124,43 @@ class Note
     public function setTags(Collection $tags): void
     {
         $this->tags = $tags;
+    }
+
+    public function isFavorite(): bool
+    {
+        return $this->isFavorite;
+    }
+
+    public function setFavorite(bool $favorite): void
+    {
+        $this->isFavorite = $favorite;
+    }
+
+    public function toggleFavorite(): void
+    {
+        $this->isFavorite = !$this->isFavorite;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function getDeletedAt(): ?\DateTimeImmutable
+    {
+        return $this->deletedAt;
+    }
+
+    public function isDeleted(): bool
+    {
+        return $this->deletedAt !== null;
+    }
+
+    public function softDelete(): void
+    {
+        $this->deletedAt = new \DateTimeImmutable();
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function restore(): void
+    {
+        $this->deletedAt = null;
+        $this->updatedAt = new \DateTimeImmutable();
     }
 }

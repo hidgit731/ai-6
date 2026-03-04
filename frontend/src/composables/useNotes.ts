@@ -7,6 +7,8 @@ export interface NoteListItem {
     createdAt: string
     folderId: string | null
     tags: Tag[]
+    isFavorite?: boolean
+    deletedAt?: string | null
 }
 
 export interface Note {
@@ -18,6 +20,8 @@ export interface Note {
     folderId: string | null
     folderName: string | null
     tags: Tag[]
+    isFavorite?: boolean
+    deletedAt?: string | null
 }
 
 export interface PaginatedNotes {
@@ -113,5 +117,70 @@ export function useNotes() {
         return res.json()
     }
 
-    return { list, getById, create, update, remove, moveNoteToFolder }
+    async function toggleFavorite(noteId: string): Promise<Note> {
+        const res = await fetch(`${API_BASE}/notes/${noteId}/favorite`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+        })
+        if (res.status === 404) throw new Error('Заметка не найдена.')
+        if (res.status === 409) throw new Error('Невозможно отметить удаленную заметку.')
+        if (!res.ok) throw new Error('Ошибка переключения избранного')
+        return res.json()
+    }
+
+    async function softDelete(noteId: string): Promise<void> {
+        const res = await fetch(`${API_BASE}/notes/${noteId}`, {
+            method: 'DELETE',
+        })
+        if (res.status === 404) throw new Error('Заметка не найдена.')
+        if (res.status === 409) throw new Error('Заметка уже удалена.')
+        if (!res.ok) throw new Error('Ошибка удаления заметки')
+    }
+
+    async function permanentDelete(noteId: string): Promise<void> {
+        const res = await fetch(`${API_BASE}/notes/${noteId}/permanent`, {
+            method: 'DELETE',
+        })
+        if (res.status === 404) throw new Error('Заметка не найдена.')
+        if (res.status === 409) throw new Error('Заметка не в корзине.')
+        if (!res.ok) throw new Error('Ошибка безвозвратного удаления')
+    }
+
+    async function restore(noteId: string): Promise<Note> {
+        const res = await fetch(`${API_BASE}/notes/${noteId}/restore`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+        })
+        if (res.status === 404) throw new Error('Заметка не найдена.')
+        if (res.status === 409) throw new Error('Заметка не удалена.')
+        if (!res.ok) throw new Error('Ошибка восстановления заметки')
+        return res.json()
+    }
+
+    async function getFavorites(page = 1, limit = 20): Promise<PaginatedNotes> {
+        const res = await fetch(`${API_BASE}/notes/favorites?page=${page}&limit=${limit}`)
+        if (!res.ok) throw new Error('Ошибка загрузки избранного')
+        return res.json()
+    }
+
+    async function getTrash(page = 1, limit = 20): Promise<PaginatedNotes> {
+        const res = await fetch(`${API_BASE}/notes/trash?page=${page}&limit=${limit}`)
+        if (!res.ok) throw new Error('Ошибка загрузки корзины')
+        return res.json()
+    }
+
+    return {
+        list,
+        getById,
+        create,
+        update,
+        remove,
+        moveNoteToFolder,
+        toggleFavorite,
+        softDelete,
+        permanentDelete,
+        restore,
+        getFavorites,
+        getTrash,
+    }
 }

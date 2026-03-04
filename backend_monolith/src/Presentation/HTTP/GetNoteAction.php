@@ -14,7 +14,7 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Uid\Uuid;
 
 #[AsController]
-#[Route('/api/notes/{id}', methods: ['GET'])]
+#[Route('/api/notes/{id}', methods: ['GET'], requirements: ['id' => '[0-9a-f\-]++'])]
 #[OA\Get(
     path: '/api/notes/{id}',
     summary: 'Получение заметки',

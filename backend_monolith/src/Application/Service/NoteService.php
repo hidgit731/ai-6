@@ -86,7 +86,11 @@ class NoteService
             throw new NotFoundHttpException('Заметка не найдена.');
         }
 
-        $this->noteRepository->delete($note);
+        if ($note->isDeleted()) {
+            throw new \DomainException('Заметка уже удалена.');
+        }
+
+        $this->softDelete($note);
     }
 
     public function getById(Uuid $id): NoteResponse
@@ -152,6 +156,80 @@ class NoteService
         return $this->toResponse($note);
     }
 
+    public function toggleFavorite(Note $note): Note
+    {
+        $note->toggleFavorite();
+        $this->noteRepository->save($note);
+        return $note;
+    }
+
+    public function softDelete(Note $note): Note
+    {
+        $note->softDelete();
+        $this->noteRepository->save($note);
+        return $note;
+    }
+
+    public function permanentDelete(Uuid $id): void
+    {
+        $note = $this->noteRepository->findById($id);
+
+        if (null === $note) {
+            throw new NotFoundHttpException('Заметка не найдена.');
+        }
+
+        if (!$note->isDeleted()) {
+            throw new \DomainException('Нельзя безвозвратно удалить заметку, не находящуюся в корзине.');
+        }
+
+        $this->noteRepository->delete($note);
+    }
+
+    public function restore(Note $note): Note
+    {
+        if (!$note->isDeleted()) {
+            throw new \DomainException('Заметка не удалена.');
+        }
+        $note->restore();
+        $this->noteRepository->save($note);
+        return $note;
+    }
+
+    public function getFavorites(int $page = 1, int $limit = 20): PaginatedNotesResponse
+    {
+        $result = $this->noteRepository->findFavorites($page, $limit);
+        $items = array_map(fn (Note $note) => $this->toListItemResponse($note), $result['items']);
+        $totalPages = (int) ceil($result['total'] / $limit);
+
+        return new PaginatedNotesResponse(
+            items: $items,
+            page: $page,
+            perPage: $limit,
+            total: $result['total'],
+            totalPages: max(1, $totalPages),
+        );
+    }
+
+    public function getTrash(int $page = 1, int $limit = 20): PaginatedNotesResponse
+    {
+        $result = $this->noteRepository->findTrash($page, $limit);
+        $items = array_map(fn (Note $note) => $this->toListItemResponse($note), $result['items']);
+        $totalPages = (int) ceil($result['total'] / $limit);
+
+        return new PaginatedNotesResponse(
+            items: $items,
+            page: $page,
+            perPage: $limit,
+            total: $result['total'],
+            totalPages: max(1, $totalPages),
+        );
+    }
+
+    public function emptyTrash(): int
+    {
+        return $this->noteRepository->deleteExpiredTrash(new \DateTimeImmutable('now - 30 days'));
+    }
+
     private function toResponse(Note $note): NoteResponse
     {
         return new NoteResponse(
@@ -166,6 +244,8 @@ class NoteService
                 static fn (Tag $t) => TagResponse::fromEntity($t),
                 $note->getTags()->toArray(),
             ),
+            isFavorite: $note->isFavorite(),
+            deletedAt: $note->getDeletedAt()?->format(\DateTimeInterface::ATOM),
         );
     }
 
@@ -181,6 +261,8 @@ class NoteService
                 static fn (Tag $t) => TagResponse::fromEntity($t),
                 $note->getTags()->toArray(),
             ),
+            isFavorite: $note->isFavorite(),
+            deletedAt: $note->getDeletedAt()?->format(\DateTimeInterface::ATOM),
         );
     }
 
