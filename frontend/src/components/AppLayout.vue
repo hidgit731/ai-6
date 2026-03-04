@@ -2,6 +2,7 @@
 import { RouterView } from 'vue-router'
 import FolderTree from './FolderTree.vue'
 import ToastContainer from './ToastContainer.vue'
+import SearchBar from './SearchBar.vue'
 </script>
 
 <template>
@@ -9,6 +10,7 @@ import ToastContainer from './ToastContainer.vue'
     <header class="app-layout__header">
       <div class="app-layout__header-inner">
         <span class="app-layout__logo">Заметки</span>
+        <SearchBar />
       </div>
     </header>
 

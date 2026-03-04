@@ -41,6 +41,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/NoteEditPage.vue'),
     },
     {
+        // IMPORTANT: /search MUST be declared before the fallback /:pathMatch
+        path: '/search',
+        name: 'search',
+        component: () => import('@/pages/SearchResultsPage.vue'),
+    },
+    {
         // Fallback: catches all unmatched routes → 404
         // MUST be last in the array
         path: '/:pathMatch(.*)*',

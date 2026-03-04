@@ -164,6 +164,97 @@ GitHub Actions запускает при каждом Pull Request:
 
 ## Changelog
 
+### [008] Full-text Search — 2026-03-06
+
+Реализована полнотекстовая поиск по заметкам с использованием встроенного PostgreSQL `tsvector` и `tsquery`. Поддержка поиска по названию и содержимому с учётом русского языка, ранжирование результатов по релевантности, пагинация результатов поиска.
+
+**Backend — добавлено:**
+
+- **`src/Domain/Repository/SearchRepositoryInterface`** — контракт: `findByQuery(query, page, limit)` для полнотекстового поиска.
+- **`src/Infrastructure/Persistence/Repository/DoctrineSearchRepository`** — реализация на Doctrine DBAL (нативный SQL для FTS):
+  - использует `note.search_vector` (tsvector) с `websearch_to_tsquery` для веб-синтаксиса поиска (`AND`, `OR`, фразы в кавычках).
+  - возвращает результаты с ранжированием (ts_rank) по убыванию релевантности.
+  - поддерживает пагинацию (LIMIT, OFFSET).
+- **`src/Application/DTO/Request/SearchNotesRequest`** — запрос с полями `query` (строка, опционально пустая), `page` (целое число).
+- **`src/Application/DTO/Response/SearchResultItemResponse`** — результат поиска (id, title, content preview, rank).
+- **`src/Application/DTO/Response/SearchResultPageResponse`** — страница результатов (items, total, page, perPage, pages).
+- **`src/Application/Service/SearchService`** — сервис поиска:
+  - метод `search(query, page)` — выполняет поиск через репозиторий.
+  - пустой запрос (пробелы) не отправляется в БД, возвращает пустые результаты.
+  - возвращает Response DTO с пагинированными результатами.
+- **`src/Presentation/HTTP/SearchNotesAction`** — Action-контроллер:
+  - POST `/api/notes/search` (priority=1, ранний роут перед list).
+  - принимает `SearchNotesRequest` DTO (query и page).
+  - валидирует через Symfony Validator.
+  - вызывает `SearchService::search()`.
+  - возвращает `SearchResultPageResponse`.
+- **`migrations/Version20260306000001.php`** — миграция PostgreSQL:
+  - добавление колонки `search_vector` (tsvector) в таблицу `note`.
+  - создание GIN-индекса на `search_vector` для быстрого поиска.
+  - BEFORE-триггер `note_search_vector_update` на INSERT и UPDATE `note`:
+    - вычисляет `setweight(to_tsvector('russian', COALESCE(title, '')), 'A') || setweight(to_tsvector('russian', COALESCE(content, '')), 'B')`.
+    - вес A для названия (выше релевантность), вес B для содержимого.
+    - запускается при изменении `title` или `content`.
+
+**Backend — тесты:**
+
+| Файл                                                     | Тип         | Описание                                                             |
+|----------------------------------------------------------|-------------|----------------------------------------------------------------------|
+| `tests/Integration/Action/SearchNotesActionTest`         | Integration | POST /api/notes/search, пагинация, empty query, валидация параметров |
+| `tests/Unit/Application/Service/SearchServiceTest`       | Unit        | Поиск с query, пустая query, пагинация — мокированные                |
+
+**Frontend — добавлено:**
+
+- **`src/composables/useSearch.ts`** — composable для взаимодействия с API:
+  - функция `searchNotes(query, page)` — POST запрос к `/api/notes/search`.
+  - возвращает Promise с `SearchResultPageResponse`.
+- **`src/stores/search.ts`** (Pinia) — хранилище состояния поиска:
+  - state: `query` (текущий поисковый запрос), `results` (массив `SearchResultItemResponse`), `pagination` (page, perPage, total, pages).
+  - action `performSearch(query, page)` — вызов composable + обновление state.
+  - action `clearSearch()` — очистка результатов.
+- **`src/components/SearchBar.vue`** — компонент строки поиска:
+  - input с debounce 300ms на изменение текста.
+  - кнопка поиска (или Enter) отправляет запрос.
+  - показывает счётчик результатов.
+  - интеграция с `useSearchStore`.
+- **`src/pages/SearchResultsPage.vue`** — страница результатов:
+  - отображает результаты в виде карточек (аналогично `NoteCard`).
+  - пагинация (компонент `Pagination`).
+  - пустые результаты: уведомление "Результаты не найдены".
+  - интеграция с `useSearchStore`.
+- **`src/components/AppLayout.vue`** — расширен: интеграция `SearchBar` в шапку (header).
+- **`src/router/index.ts`** — добавлен маршрут `/search` → `SearchResultsPage` (ПЕРЕД fallback маршрутом `/:pathMatch(.*)* → NotFoundPage`).
+- **Новые пакеты**: нет (используются существующие `marked`, `dompurify`).
+
+**Frontend — тесты:**
+
+| Файл                                                       | Тип            | Описание                                           |
+|------------------------------------------------------------|----------------|----------------------------------------------------|
+| `src/composables/useSearch.test.ts`                        | Unit (Vitest)  | POST запрос, обработка ответа, ошибки              |
+| `src/components/__tests__/SearchBar.test.ts`               | Unit (Vitest)  | Ввод, debounce, Enter, кнопка поиска               |
+| `src/pages/__tests__/SearchResultsPage.test.ts`            | Unit (Vitest)  | Рендеринг результатов, пагинация, пустой результат |
+| `src/pages/__tests__/SearchResultsPage.pagination.test.ts` | Unit (Vitest)  | Переход между страницами, обновление результатов   |
+
+**API — эндпоинты:**
+
+| Метод  | Путь                    | Действие                             |
+|--------|-------------------------|--------------------------------------|
+| `POST` | `/api/notes/search`     | Полнотекстовой поиск (priority=1)    |
+
+**PostgreSQL FTS — особенности:**
+
+- **Язык**: `russian` конфигурация для учёта морфологии русского языка.
+- **Ранжирование**: `ts_rank()` вычисляет релевантность (0–1).
+- **Синтаксис**: `websearch_to_tsquery()` поддерживает веб-синтаксис:
+  - `term1 term2` — оба термина (AND).
+  - `term1 OR term2` — один из терминов.
+  - `"phrase"` — точная фраза.
+  - `-term` — исключение термина.
+- **Пустой запрос**: Фронтенд не отправляет пустой запрос (debounce + validation); бэкенд возвращает 200 с пустым списком, если query пустой.
+- **Индекс**: GIN-индекс на `search_vector` ускоряет поиск на больших таблицах.
+
+---
+
 ### [007] Favorites & Trash System — 2026-03-05
 
 Реализована система избранного и удаления заметок в корзину: возможность отмечать заметки как избранные, мягкое удаление заметок (с отправкой в корзину), восстановление из корзины, постоянное удаление, автоматическая очистка старых данных из корзины.
