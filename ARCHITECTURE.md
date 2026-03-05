@@ -164,6 +164,106 @@ GitHub Actions запускает при каждом Pull Request:
 
 ## Changelog
 
+### [011] Export Dashboard & File Export — 2026-03-09
+
+Реализована информационная панель со статистикой и функцией экспорта заметок: отображение ключевых метрик (количество заметок, тегов, папок), визуализация активности создания заметок за последние 30 дней, экспорт заметок в форматы Markdown и PDF.
+
+**Backend — добавлено:**
+
+- **`src/Domain/Repository/DashboardRepositoryInterface`** — контракт: `countActiveNotes()`, `countTags()`, `countActiveFolders()`, `getActivityLast30Days()`.
+- **`src/Infrastructure/Persistence/Repository/DoctrineDashboardRepository`** — реализация на Doctrine DBAL (нативный SQL для быстрого подсчёта):
+  - `countActiveNotes()` — COUNT WHERE deleted_at IS NULL (исключает мягкоудалённые).
+  - `countTags()`, `countActiveFolders()` — простые COUNT запросы.
+  - `getActivityLast30Days()` — GROUP BY DATE с zero-fill в сервисном слое; возвращает массив `[['date' => 'YYYY-MM-DD', 'count' => int]]`.
+- **`src/Application/DTO/Response/`** — новые DTO:
+  - `ActivityPointDTO` — точка активности (date, count).
+  - `DashboardStatsResponse` — статистика дашборда (notesCount, tagsCount, foldersCount, activity[]).
+  - `ExportedFile` — файл для скачивания (filename, content, mimeType); factory-методы `forMarkdown()`, `forPdf()`.
+- **`src/Application/Service/DashboardService`** — сервис статистики:
+  - `getStats(): DashboardStatsResponse` — собирает данные через репозиторий, строит series активности (заполняет нулями для дней без заметок).
+  - `buildActivitySeries()` — вспомогательный метод для zero-fill активности за 30 дней.
+- **`src/Application/Service/ExportService`** — сервис экспорта:
+  - `exportMarkdown(noteId): ExportedFile` — возвращает содержимое заметки в Markdown с заголовком.
+  - `exportPdf(noteId): ExportedFile` — конвертирует Markdown → HTML через `league/commonmark`, генерирует PDF через `dompdf/dompdf`, удаляет wiki-ссылки перед конвертацией.
+  - `stripWikiLinks(content)` — регулярное выражение для удаления `[[...]]` (остаётся текст внутри).
+  - `sanitizeFilename(title)` — очистка имени файла (удаляет спецсимволы, ограничивает до 200 символов).
+- **Новые Action-контроллеры** (`src/Presentation/HTTP/`):
+  - `GetDashboardAction` — `GET /api/dashboard`, возвращает `DashboardStatsResponse::toArray()`.
+  - `ExportMarkdownAction` — `GET /api/notes/{id}/export/markdown` (priority=1), возвращает `text/markdown` с `Content-Disposition: attachment`.
+  - `ExportPdfAction` — `GET /api/notes/{id}/export/pdf` (priority=1), возвращает `application/pdf` с `Content-Disposition: attachment`.
+- **`src/DataFixtures/AppFixtures.php`** — фикстуры для тестирования: создание 50 заметок с разными датами для демонстрации активности на 30 дней, теги и папки.
+- **Новые пакеты**: `dompdf/dompdf ^3.1`, `league/commonmark ^2.8`, `doctrine/doctrine-fixtures-bundle ^4.3` (dev).
+- **`bundles.php`** — добавлен `Doctrine\Bundle\FixturesBundle\DoctrineFixturesBundle`.
+
+**Backend — тесты:**
+
+| Файл                                                     | Тип          | Описание                                                                      |
+|----------------------------------------------------------|--------------|-------------------------------------------------------------------------------|
+| `tests/Unit/Application/Service/DashboardServiceTest`    | Unit         | getStats, buildActivitySeries, zero-fill за 30 дней — мокированные репо       |
+| `tests/Unit/Application/Service/ExportServiceTest`       | Unit         | exportMarkdown, exportPdf, stripWikiLinks, sanitizeFilename — мокированные    |
+
+**Frontend — добавлено:**
+
+- **`src/pages/DashboardPage.vue`** — страница дашборда:
+  - загружает статистику при монтировании через `useDashboard()->fetchStats()`.
+  - отображает три карточки статистики через компонент `DashboardStatCard`.
+  - интерактивный граф активности через компонент `ActivityChart`.
+  - состояния loading и error из `useDashboardStore`.
+- **`src/stores/dashboard.ts`** (Pinia) — хранилище состояния дашборда:
+  - state: `stats` (DashboardStats), `loading` (boolean), `error` (string|null).
+  - интерфейсы TypeScript для типизации: `ActivityPoint`, `DashboardStats`.
+- **`src/composables/useDashboard.ts`** — composable для API:
+  - `fetchStats()` — GET запрос к `/api/dashboard`, обновляет store.
+- **`src/composables/useExport.ts`** — composable для экспорта заметок:
+  - `downloadMarkdown(noteId)` — скачивает Markdown файл; парсит `Content-Disposition` для имени файла.
+  - `downloadPdf(noteId)` — скачивает PDF файл с обработкой ошибок; `isPdfLoading`, `pdfError` ref для контроля UI.
+  - blob download pattern: `fetch` → `blob()` → `ObjectURL` → `a.download` → cleanup.
+- **Новые компоненты**:
+  - `DashboardStatCard.vue` — карточка метрики (label, value); стили через CSS переменные.
+  - `ActivityChart.vue` — граф активности на Chart.js v4 + vue-chartjs v5:
+    - Line чарт с `tension: 0.3` для плавных линий.
+    - `fill: true` (заливка под кривой).
+    - `labels` формируются как `MM-DD` из полных дат.
+    - `responsive: true`, `maintainAspectRatio: false` (адаптивная высота).
+- **`src/router/index.ts`** — добавлен маршрут:
+  - `/dashboard` → `DashboardPage` (ПЕРЕД fallback маршрутом `/:pathMatch(.*)* → NotFoundPage`).
+- **`src/pages/NoteEditPage.vue`** — расширена:
+  - интеграция кнопок экспорта (Markdown и PDF) через `useExport().downloadMarkdown()` / `downloadPdf()`.
+  - обработка состояния `isPdfLoading` и `pdfError` при клике на кнопку экспорта PDF.
+- **`src/components/AppLayout.vue`** — расширен:
+  - добавлена навигационная ссылка на `/dashboard` в шапке.
+- **Новые пакеты**: `chart.js ^4.5.1`, `vue-chartjs ^5.3.3`.
+
+**Frontend — тесты:**
+
+| Файл                                                | Тип            | Описание                                                     |
+|-----------------------------------------------------|----------------|--------------------------------------------------------------|
+| `src/composables/useExport.test.ts`                 | Unit (Vitest)  | downloadMarkdown, downloadPdf, ошибки, парсинг filename      |
+| `src/stores/dashboard.test.ts`                      | Unit (Vitest)  | Инициализация, состояние stats/loading/error                 |
+
+**API — новые эндпоинты:**
+
+| Метод  | Путь                              | Действие                                                      |
+|--------|-----------------------------------|---------------------------------------------------------------|
+| `GET`  | `/api/dashboard`                  | Статистика (notes_count, tags_count, folders_count, activity) |
+| `GET`  | `/api/notes/{id}/export/markdown` | Экспорт заметки в Markdown (priority=1)                       |
+| `GET`  | `/api/notes/{id}/export/pdf`      | Экспорт заметки в PDF (priority=1)                            |
+
+**Инфраструктура:**
+
+- **`docker-compose.yaml`** — добавлены volume bind для AppFixtures (опционально для dev-данных).
+- **`.env.example`** — добавлены переменные для кэша дополнительных библиотек (если требуется).
+
+**Экспорт — особенности:**
+
+- **Markdown-экспорт**: содержимое заметки с заголовком в виде `# Title`.
+- **PDF-экспорт**: использует `GithubFlavoredMarkdownConverter` для более красивого HTML; удаляет wiki-ссылки перед конвертацией (regex-замена `[[Text]]` → `Text`).
+- **PDF-стили**: DejaVu fonts (поддерживают Unicode), фиксированные шрифты для кода, блокquotes с левой границей.
+- **Имена файлов**: очищены от спецсимволов, ограничены 200 символами, fallback на `note.md` / `note.pdf` если пусто.
+- **Активность**: zero-fill за 30 дней (если в день 0 заметок, показываются как 0, не пропускаются).
+
+---
+
 ### [010] Note Link Graph — 2026-03-08
 
 Реализована система связей между заметками через wiki-ссылки и интерактивный граф знаний: автоматическое извлечение wiki-ссылок вида `[[Название заметки]]` из содержимого, отслеживание входящих и исходящих ссылок, визуализация сети заметок в виде интерактивного графа с возможностью навигации.

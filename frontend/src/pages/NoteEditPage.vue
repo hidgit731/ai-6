@@ -8,11 +8,13 @@ import { useNotesStore } from '@/stores/notes'
 import { useNoteVersionsStore } from '@/stores/noteVersions'
 import { useNoteLinksStore } from '@/stores/noteLinks'
 import NoteLinksPanel from '@/components/NoteLinksPanel.vue'
+import { useExport } from '@/composables/useExport'
 
 const route = useRoute()
 const router = useRouter()
 const notesStore = useNotesStore()
 const noteVersionsStore = useNoteVersionsStore()
+const { downloadMarkdown, downloadPdf, isPdfLoading, pdfError } = useExport()
 const noteLinksStore = useNoteLinksStore()
 
 const isEditMode = computed(() => route.name === 'note-edit')
@@ -146,6 +148,24 @@ async function handleSave(): Promise<void> {
                 >
                     {{ isLoading ? 'Сохранение...' : 'Сохранить' }}
                 </button>
+                <template v-if="isEditMode && noteId">
+                    <button
+                        class="btn-export"
+                        type="button"
+                        @click="downloadMarkdown(noteId!)"
+                    >
+                        Скачать .md
+                    </button>
+                    <button
+                        class="btn-export btn-export--pdf"
+                        type="button"
+                        :disabled="isPdfLoading"
+                        @click="downloadPdf(noteId!)"
+                    >
+                        {{ isPdfLoading ? 'Генерация...' : 'Скачать PDF' }}
+                    </button>
+                    <span v-if="pdfError" class="export-error">{{ pdfError }}</span>
+                </template>
             </div>
         </template>
 
@@ -252,5 +272,38 @@ async function handleSave(): Promise<void> {
 .btn-save:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+}
+
+.btn-export {
+    padding: 8px 16px;
+    background: #6c757d;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.btn-export:hover:not(:disabled) {
+    background: #5a6268;
+}
+
+.btn-export--pdf {
+    background: #dc3545;
+}
+
+.btn-export--pdf:hover:not(:disabled) {
+    background: #c82333;
+}
+
+.btn-export:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.export-error {
+    color: #dc3545;
+    font-size: 13px;
+    margin-left: 8px;
 }
 </style>

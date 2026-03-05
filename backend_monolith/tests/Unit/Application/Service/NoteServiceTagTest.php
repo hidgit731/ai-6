@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Application\Service;
 
 use App\Application\DTO\Request\CreateNoteRequest;
 use App\Application\DTO\Request\UpdateNoteRequest;
+use App\Application\Service\NoteLinkService;
 use App\Application\Service\NoteService;
 use App\Domain\Entity\Note;
 use App\Domain\Entity\Tag;
@@ -34,6 +35,7 @@ class NoteServiceTagTest extends TestCase
             $this->folderRepository,
             $this->tagRepository,
             $this->createMock(NoteVersionRepositoryInterface::class),
+            $this->createMock(NoteLinkService::class),
         );
     }
 

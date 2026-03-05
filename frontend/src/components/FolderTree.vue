@@ -67,8 +67,8 @@ async function handleCreateFolder(): Promise<void> {
 
 function handleSelectFolder(folderId: string): void {
     foldersStore.selectFolder(folderId)
-    // If we're on favorites or trash, go back to the main notes list
-    if (router.currentRoute.value.name === 'favorites' || router.currentRoute.value.name === 'trash') {
+    const name = router.currentRoute.value.name
+    if (name !== 'notes-list') {
         router.push({ name: 'notes-list' })
     }
 }

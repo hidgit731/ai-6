@@ -23,14 +23,14 @@ services:
     ports:
       - '${FORWARD_DB_PORT:-5432}:5432'
     environment:
-      POSTGRES_DB: '${DB_NAME:-app}'
-      POSTGRES_USER: '${DB_USER:-app}'
-      POSTGRES_PASSWORD: '${DB_PASSWORD:-secret}'
+      POSTGRES_DB: '${DB_NAME}'
+      POSTGRES_USER: '${DB_USER}'
+      POSTGRES_PASSWORD: '${DB_PASSWORD}'
     volumes:
       - 'postgres_data:/var/lib/postgresql'
       - 'postgres_dump:/app/dump'
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${DB_USER:-app}']
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USER} -d ${DB_NAME}']
       interval: 5s
       timeout: 5s
       retries: 10
@@ -48,6 +48,12 @@ services:
     container_name: 'notes_backend_monolith'
     working_dir: '/app'
     restart: "no"
+    environment:
+      DB_NAME: '${DB_NAME}'
+      DB_USER: '${DB_USER}'
+      DB_PASSWORD: '${DB_PASSWORD}'
+      DB_HOST: '${DB_HOST}'
+      DB_PORT: '${DB_PORT}'
     volumes:
       - ./backend_monolith:/app
       - '${HOST_COMPOSER_CACHE_DIR:-~/.cache/composer}:${CONTAINER_COMPOSER_CACHE_DIR:-/.composer/cache}'

@@ -52,6 +52,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/KnowledgeGraphPage.vue'),
     },
     {
+        // IMPORTANT: /dashboard MUST be declared before the fallback /:pathMatch
+        path: '/dashboard',
+        name: 'dashboard',
+        component: () => import('@/pages/DashboardPage.vue'),
+    },
+    {
         // Fallback: catches all unmatched routes → 404
         // MUST be last in the array
         path: '/:pathMatch(.*)*',

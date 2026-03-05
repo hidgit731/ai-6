@@ -30,3 +30,10 @@ services:
 
     App\Domain\Repository\NoteLinkRepositoryInterface:
         class: App\Infrastructure\Persistence\Repository\DoctrineNoteLinkRepository
+
+    App\Domain\Repository\DashboardRepositoryInterface:
+        class: App\Infrastructure\Persistence\Repository\DoctrineDashboardRepository
+
+    App\DataFixtures\AppFixtures:
+        arguments:
+            $appEnv: '%kernel.environment%'

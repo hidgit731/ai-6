@@ -12,6 +12,7 @@ import SearchBar from './SearchBar.vue'
         <span class="app-layout__logo">Заметки</span>
         <SearchBar />
         <RouterLink to="/graph" class="app-layout__graph-link">Граф</RouterLink>
+        <RouterLink to="/dashboard" class="app-layout__graph-link">Дашборд</RouterLink>
       </div>
     </header>
 
