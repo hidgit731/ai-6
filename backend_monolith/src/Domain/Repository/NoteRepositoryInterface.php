@@ -48,4 +48,11 @@ interface NoteRepositoryInterface
     public function findTrash(int $page = 1, int $limit = 20): array;
 
     public function deleteExpiredTrash(\DateTimeImmutable $before): int;
+
+    public function findByTitle(string $title): ?Note;
+
+    /**
+     * @return Note[]
+     */
+    public function findAll(): array;
 }

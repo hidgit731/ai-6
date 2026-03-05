@@ -203,6 +203,31 @@ class DoctrineNoteRepository implements NoteRepositoryInterface
         return $qb->getQuery()->executeStatement();
     }
 
+    public function findByTitle(string $title): ?Note
+    {
+        return $this->entityManager->createQueryBuilder()
+            ->select('n')
+            ->from(Note::class, 'n')
+            ->where('n.title = :title')
+            ->andWhere('n.deletedAt IS NULL')
+            ->orderBy('n.createdAt', 'ASC')
+            ->setMaxResults(1)
+            ->setParameter('title', $title)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    public function findAll(): array
+    {
+        return $this->entityManager->createQueryBuilder()
+            ->select('n')
+            ->from(Note::class, 'n')
+            ->where('n.deletedAt IS NULL')
+            ->orderBy('n.createdAt', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
     private function applyFolderFilter(\Doctrine\ORM\QueryBuilder $qb, ?string $folderId): void
     {
         if (null === $folderId) {

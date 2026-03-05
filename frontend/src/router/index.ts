@@ -47,6 +47,11 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/SearchResultsPage.vue'),
     },
     {
+        path: '/graph',
+        name: 'knowledge-graph',
+        component: () => import('@/pages/KnowledgeGraphPage.vue'),
+    },
+    {
         // Fallback: catches all unmatched routes → 404
         // MUST be last in the array
         path: '/:pathMatch(.*)*',

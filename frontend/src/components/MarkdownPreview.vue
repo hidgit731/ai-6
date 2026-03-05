@@ -4,11 +4,12 @@ import { useMarkdown } from '@/composables/useMarkdown'
 
 const props = defineProps<{
     content: string
+    wikiLinkMap?: Map<string, string>
 }>()
 
 const { renderMarkdown } = useMarkdown()
 
-const renderedHtml = computed(() => renderMarkdown(props.content))
+const renderedHtml = computed(() => renderMarkdown(props.content, props.wikiLinkMap ?? new Map()))
 </script>
 
 <template>
@@ -68,5 +69,17 @@ const renderedHtml = computed(() => renderMarkdown(props.content))
 .markdown-preview :deep(a) {
     color: #4a90d9;
     text-decoration: underline;
+}
+
+.markdown-preview :deep(.wiki-link) {
+    color: #4a90d9;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.markdown-preview :deep(.wiki-link--unresolved) {
+    color: #aaa;
+    text-decoration: underline dotted;
+    cursor: default;
 }
 </style>

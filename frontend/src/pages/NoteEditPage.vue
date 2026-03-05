@@ -1,16 +1,19 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import TagInput from '@/components/TagInput.vue'
 import VersionHistoryPanel from '@/components/VersionHistoryPanel.vue'
 import { useNotesStore } from '@/stores/notes'
 import { useNoteVersionsStore } from '@/stores/noteVersions'
+import { useNoteLinksStore } from '@/stores/noteLinks'
+import NoteLinksPanel from '@/components/NoteLinksPanel.vue'
 
 const route = useRoute()
 const router = useRouter()
 const notesStore = useNotesStore()
 const noteVersionsStore = useNoteVersionsStore()
+const noteLinksStore = useNoteLinksStore()
 
 const isEditMode = computed(() => route.name === 'note-edit')
 const noteId = computed(() => route.params.id as string | undefined)
@@ -22,6 +25,11 @@ const titleError = ref<string | null>(null)
 const submitError = ref<string | null>(null)
 const isLoading = ref(false)
 
+const wikiLinkMap = computed<Map<string, string>>(() => {
+    const links = noteLinksStore.currentNoteLinks?.outgoing ?? []
+    return new Map(links.map((r) => [r.title, r.id]))
+})
+
 onMounted(async () => {
     if (isEditMode.value && noteId.value) {
         await notesStore.fetchById(noteId.value)
@@ -29,8 +37,13 @@ onMounted(async () => {
             title.value = notesStore.currentNote.title
             content.value = notesStore.currentNote.content ?? ''
             tags.value = notesStore.currentNote.tags.map((t) => t.name)
+            await noteLinksStore.fetchLinks(noteId.value)
         }
     }
+})
+
+onUnmounted(() => {
+    noteLinksStore.clearLinks()
 })
 
 // Sync editor when store.currentNote is updated after a revert
@@ -44,6 +57,16 @@ watch(
         }
     },
 )
+
+function handleMarkdownClick(e: MouseEvent): void {
+    const a = (e.target as Element).closest('a.wiki-link')
+    if (!a) return
+    e.preventDefault()
+    const id = a.getAttribute('data-note-id')
+    if (id) {
+        router.push(`/notes/${id}`)
+    }
+}
 
 async function handleSave(): Promise<void> {
     titleError.value = null
@@ -101,10 +124,14 @@ async function handleSave(): Promise<void> {
         <div v-if="notesStore.loading && isEditMode" class="loading">Загрузка...</div>
         <div v-else-if="notesStore.error" class="error-message">{{ notesStore.error }}</div>
         <template v-else>
-            <MarkdownEditor
-                v-model:title="title"
-                v-model:content="content"
-            />
+            <!-- eslint-disable-next-line vuejs-accessibility/click-events-have-key-events -->
+            <div @click="handleMarkdownClick">
+                <MarkdownEditor
+                    v-model:title="title"
+                    v-model:content="content"
+                    :wiki-link-map="wikiLinkMap"
+                />
+            </div>
 
             <TagInput v-model="tags" placeholder="Добавить тег..." />
 
@@ -121,6 +148,8 @@ async function handleSave(): Promise<void> {
                 </button>
             </div>
         </template>
+
+        <NoteLinksPanel v-if="isEditMode && noteId" :note-id="noteId!" />
 
         <VersionHistoryPanel
             v-if="noteVersionsStore.isPanelOpen && noteId"

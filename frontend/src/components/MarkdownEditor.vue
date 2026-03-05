@@ -4,6 +4,7 @@ import MarkdownPreview from '@/components/MarkdownPreview.vue'
 const props = defineProps<{
     title: string
     content: string
+    wikiLinkMap?: Map<string, string>
 }>()
 
 const emit = defineEmits<{
@@ -35,7 +36,7 @@ const emit = defineEmits<{
             </div>
             <div class="preview-pane">
                 <label class="pane-label">Предпросмотр</label>
-                <MarkdownPreview :content="props.content" />
+                <MarkdownPreview :content="props.content" :wiki-link-map="props.wikiLinkMap" />
             </div>
         </div>
     </div>

@@ -1,22 +1,44 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import MarkdownPreview from '@/components/MarkdownPreview.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import NoteLinksPanel from '@/components/NoteLinksPanel.vue'
 import { useNotesStore } from '@/stores/notes'
-import { ref } from 'vue'
+import { useNoteLinksStore } from '@/stores/noteLinks'
 
 const route = useRoute()
 const router = useRouter()
 const notesStore = useNotesStore()
+const noteLinksStore = useNoteLinksStore()
 
 const showDeleteDialog = ref(false)
 const deleteError = ref<string | null>(null)
 
+const wikiLinkMap = computed<Map<string, string>>(() => {
+    const links = noteLinksStore.currentNoteLinks?.outgoing ?? []
+    return new Map(links.map((r) => [r.title, r.id]))
+})
+
 onMounted(async () => {
     const id = route.params.id as string
     await notesStore.fetchById(id)
+    await noteLinksStore.fetchLinks(id)
 })
+
+onUnmounted(() => {
+    noteLinksStore.clearLinks()
+})
+
+function handleMarkdownClick(e: MouseEvent): void {
+    const a = (e.target as Element).closest('a.wiki-link')
+    if (!a) return
+    e.preventDefault()
+    const id = a.getAttribute('data-note-id')
+    if (id) {
+        router.push(`/notes/${id}`)
+    }
+}
 
 function formatDate(isoDate: string): string {
     return new Date(isoDate).toLocaleString('ru-RU', {
@@ -81,13 +103,17 @@ async function handleDelete(): Promise<void> {
 
             <div v-if="deleteError" class="error-message">{{ deleteError }}</div>
 
-            <div class="note-content">
+            <!-- eslint-disable-next-line vuejs-accessibility/click-events-have-key-events -->
+            <div class="note-content" @click="handleMarkdownClick">
                 <MarkdownPreview
                     v-if="notesStore.currentNote.content"
                     :content="notesStore.currentNote.content"
+                    :wiki-link-map="wikiLinkMap"
                 />
                 <p v-else class="empty-content">Содержимое отсутствует.</p>
             </div>
+
+            <NoteLinksPanel :note-id="notesStore.currentNote.id" />
         </template>
 
         <ConfirmDialog
@@ -106,6 +132,9 @@ async function handleDelete(): Promise<void> {
     max-width: 800px;
     margin: 0 auto;
     padding: 1.5rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
 }
 
 .loading {
@@ -130,7 +159,6 @@ async function handleDelete(): Promise<void> {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 1.5rem;
     flex-wrap: wrap;
     gap: 0.75rem;
 }
@@ -182,14 +210,14 @@ async function handleDelete(): Promise<void> {
 .note-title {
     font-size: 2rem;
     font-weight: bold;
-    margin: 0 0 0.5rem;
+    margin: 0;
     color: #222;
 }
 
 .note-meta {
     font-size: 0.85rem;
     color: #999;
-    margin: 0 0 1.5rem;
+    margin: 0;
 }
 
 .note-content {

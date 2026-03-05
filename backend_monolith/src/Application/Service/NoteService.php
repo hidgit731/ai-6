@@ -31,6 +31,7 @@ class NoteService
         private readonly FolderRepositoryInterface $folderRepository,
         private readonly TagRepositoryInterface $tagRepository,
         private readonly NoteVersionRepositoryInterface $versionRepository,
+        private readonly NoteLinkService $noteLinkService,
     ) {
     }
 
@@ -48,6 +49,7 @@ class NoteService
 
         $this->syncTags($note, $request->tags);
         $this->noteRepository->save($note);
+        $this->noteLinkService->extractAndSyncLinks($note);
 
         return $this->toResponse($note);
     }
@@ -81,6 +83,7 @@ class NoteService
 
         $this->syncTags($note, $request->tags);
         $this->noteRepository->save($note);
+        $this->noteLinkService->extractAndSyncLinks($note);
 
         return $this->toResponse($note);
     }

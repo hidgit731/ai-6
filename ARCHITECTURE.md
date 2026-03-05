@@ -164,6 +164,127 @@ GitHub Actions запускает при каждом Pull Request:
 
 ## Changelog
 
+### [010] Note Link Graph — 2026-03-08
+
+Реализована система связей между заметками через wiki-ссылки и интерактивный граф знаний: автоматическое извлечение wiki-ссылок вида `[[Название заметки]]` из содержимого, отслеживание входящих и исходящих ссылок, визуализация сети заметок в виде интерактивного графа с возможностью навигации.
+
+**Backend — добавлено:**
+
+- **`src/Domain/Entity/NoteLink`** — сущность связи: `id` (UUID v7), `source_note_id` (FK CASCADE), `target_note_id` (FK CASCADE), `created_at` (DATETIME). ManyToOne связи к Note для обоих направлений. UniqueConstraint на `(source_note_id, target_note_id)` (предотвращает дублирование ссылок).
+- **`src/Domain/Repository/NoteLinkRepositoryInterface`** — контракт: `save`, `findOutgoing(noteId)`, `findIncoming(noteId)`, `deleteBySourceNote(noteId)`, `findAll`.
+- **`src/Domain/Repository/NoteRepositoryInterface`** — расширен: `findByTitle(string): ?Note` (поиск заметки по точному названию), `findAll(): array` (получить все заметки).
+- **`src/Infrastructure/Persistence/Repository/DoctrineNoteLinkRepository`** — реализация на Doctrine ORM:
+  - `findOutgoing(noteId)` — исходящие ссылки (WHERE source_note_id = noteId).
+  - `findIncoming(noteId)` — входящие ссылки (WHERE target_note_id = noteId).
+  - `deleteBySourceNote(noteId)` — удаление всех ссылок при изменении заметки.
+- **`src/Application/DTO/Response/`** — новые DTO:
+  - `NoteRefDTO` — ссылка на заметку (id, title).
+  - `NoteLinksResponse` — связи заметки (outgoing, incoming).
+  - `GraphNodeDTO` — узел графа (id, title, label).
+  - `GraphEdgeDTO` — рёбро графа (source, target).
+  - `GraphResponse` — полный граф (nodes, edges).
+- **`src/Application/Service/NoteLinkService`** — сервис для работы со ссылками:
+  - `extractWikiLinkTitles(content: string): array` — извлечение wiki-ссылок вида `[[Title]]` из контента с маскированием code-блоков и inline-кода (ignore content в `` ``` `` и `` ` ``).
+  - `extractAndSyncLinks(sourceNoteId, titles)` — синхронизация: удаление старых ссылок, создание новых на основе найденных заголовков; автоматический поиск целевых заметок по названию.
+  - `getLinks(noteId)` — получить входящие/исходящие ссылки заметки.
+  - `getGraph()` — построить граф знаний (все заметки как узлы, связи как рёбра).
+- **`src/Application/Service/NoteService`** — расширен:
+  - принимает `NoteLinkService` пятым аргументом конструктора.
+  - метод `create()` / `update()` вызывает `noteLinkService->extractAndSyncLinks()` после сохранения (автоматическое обновление ссылок при изменении содержимого).
+- **Новые Action-контроллеры** (`src/Presentation/HTTP/`):
+
+  | Контроллер           | Маршрут                  |\n  |----------------------|---------------------------|\n  | `GetNoteLinksAction` | `GET /api/notes/{id}/links` (priority=1) |\n  | `GetGraphAction`     | `GET /api/graph`                        |
+
+- **`migrations/Version20260308000001.php`** — миграция PostgreSQL:
+  - создание таблицы `note_link` (UUID PK, source_note_id FK CASCADE, target_note_id FK CASCADE, created_at).
+  - UNIQUE constraint на (source_note_id, target_note_id).
+  - индексы по source_note_id и target_note_id для быстрого поиска ссылок.
+
+**Backend — тесты:**
+
+| Файл                                                       | Тип          | Описание                                                           |
+|------------------------------------------------------------|--------------|--------------------------------------------------------------------|
+| `tests/Integration/Action/GetNoteLinksActionTest`          | Integration  | GET /api/notes/{id}/links, структура outgoing/incoming             |
+| `tests/Integration/Action/GetGraphActionTest`              | Integration  | GET /api/graph, все узлы и рёбра                                   |
+| `tests/Unit/Application/Service/NoteLinkServiceTest`       | Unit         | extractWikiLinkTitles, extractAndSyncLinks, getLinks, getGraph     |
+| `tests/Unit/Application/Service/NoteServiceLinksTest`      | Unit         | create/update вызывает extractAndSyncLinks, мокированные сервисы   |
+
+**Frontend — добавлено:**
+
+- **`src/composables/useNoteLinks.ts`** — composable для работы со ссылками:
+  - `getLinks(noteId)` — GET запрос к `/api/notes/{id}/links`.
+  - `getGraph()` — GET запрос к `/api/graph`.
+- **`src/composables/useGraph.ts`** — composable для граф-операций:
+  - возвращает реактивные узлы и рёбра из API.
+- **`src/stores/noteLinks.ts`** (Pinia) — хранилище состояния ссылок:
+  - state: `outgoing` (исходящие ссылки), `incoming` (входящие ссылки).
+  - actions: `fetchLinks(noteId)`, `clearLinks`.
+- **`src/stores/graph.ts`** (Pinia) — хранилище графа:
+  - state: `nodes` (NoteRefDTO[]), `edges` (GraphEdgeDTO[]), `selectedNodeId` (nullable).
+  - actions: `fetchGraph()`, `selectNode(id)`, `deselectNode()`.
+- **`src/composables/useMarkdown.ts`** — расширен:
+  - новая функция `applyWikiLinks(html, wikiLinkMap)` — преобразование wiki-ссылок в якоря (заменяет `[[Title]]` на `<a class="wiki-link" data-note-id="...">Title</a>` или `<span class="wiki-link wiki-link--unresolved">Title</span>` если заметка не найдена).
+  - маскирование code-блоков и inline-кода перед обработкой ссылок.
+  - DOMPurify ADD_ATTR: `['data-note-id']` (атрибут для сохранения ID целевой заметки).
+  - `renderMarkdown(content, wikiLinkMap?)` — принимает опциональную карту ссылок для преобразования.
+- **`src/components/MarkdownPreview.vue`** — расширен:
+  - prop `wikiLinkMap?: Map<string, string>` (title → note ID).
+  - передаёт wikiLinkMap в `renderMarkdown()`.
+- **`src/components/MarkdownEditor.vue`** — расширен:
+  - prop `wikiLinkMap?: Map<string, string>`.
+  - передаёт wikiLinkMap в MarkdownPreview.
+- **Новый компонент**:
+  - `NoteLinksPanel.vue` — панель отображения входящих/исходящих ссылок:
+    - читает состояние из `noteLinksStore` (без самостоятельной загрузки).
+    - коллапсируемые секции (outgoing/incoming) через `<details open>`.
+    - ссылки отображаются как RouterLink для быстрой навигации.
+- **Новая страница**:
+  - `KnowledgeGraphPage.vue` — интерактивный граф знаний:
+    - D3.js v7 force-directed layout.
+    - SVG-визуализация с узлами (circles) и рёбрами (lines).
+    - интерактивность: перетаскивание узлов, pan + zoom (через `d3-zoom`).
+    - клик по узлу → router.push к заметке.
+    - легенда и счётчик элементов.
+- **`src/router/index.ts`** — добавлен маршрут:
+  - `/graph` → `KnowledgeGraphPage` (ПЕРЕД fallback маршрутом `/:pathMatch(.*)* → NotFoundPage`).
+- **`src/pages/NoteEditPage.vue`** — расширена:
+  - вызов `fetchLinks(noteId)` при загрузке заметки.
+  - computed `wikiLinkMap` на основе `outgoing` из `noteLinksStore`.
+  - передача wikiLinkMap в MarkdownEditor/Preview для подсветки ссылок.
+  - click delegation на `a.wiki-link` для навигации к связанным заметкам.
+  - вызов `clearLinks()` при unmount.
+  - интеграция `NoteLinksPanel` ниже редактора.
+- **`src/stores/notes.ts`** — синхронизирован:
+  - очистка noteLinksStore при смене текущей заметки.
+- **Новые пакеты**: `d3 ^7.9.0` (для force-directed layout и визуализации графа).
+
+**Frontend — тесты:**
+
+| Файл                                                      | Тип            | Описание                                                     |
+|-----------------------------------------------------------|----------------|--------------------------------------------------------------|
+| `src/composables/useNoteLinks.test.ts`                    | Unit (Vitest)  | GET ссылок, GET графа, обработка ошибок                      |
+| `src/composables/useMarkdown.test.ts` (расширен)          | Unit (Vitest)  | applyWikiLinks, маскирование кода, XSS-санитизация           |
+| `src/components/__tests__/NoteLinksPanel.test.ts`         | Unit (Vitest)  | Рендеринг outgoing/incoming, клик RouterLink                 |
+| `src/pages/__tests__/KnowledgeGraphPage.test.ts`          | Unit (Vitest)  | D3 force layout, pan+zoom, клик узла, легенда                |
+
+**API — эндпоинты:**
+
+| Метод  | Путь                    | Действие                                         |
+|--------|-------------------------|--------------------------------------------------|
+| `GET`  | `/api/notes/{id}/links` | Входящие и исходящие ссылки заметки (priority=1) |
+| `GET`  | `/api/graph`            | Граф знаний (все узлы и рёбра)                   |
+
+**Wiki-ссылки — синтаксис и поведение:**
+
+- **Синтаксис**: `[[Название Заметки]]` в содержимом заметки.
+- **Автоматизм**: система автоматически ищет заметку по названию и создаёт NoteLink.
+- **Отсутствующие ссылки**: если заметка с указанным названием не найдена, ссылка отображается в виде неразрешённой (BEM-класс `wiki-link--unresolved`).
+- **Маскирование**: wiki-ссылки внутри code-блоков (`` ``` ``) и inline-кода (`` ` ``) игнорируются.
+- **CSS-классы**: `wiki-link` (базовый класс) + опциональный модификатор `wiki-link--unresolved` (для неразрешённых ссылок).
+- **Атрибуты**: `data-note-id` сохраняет UUID целевой заметки для быстрой навигации.
+
+---
+
 ### [009] Note Version History — 2026-03-07
 
 Реализована система версионирования заметок: сохранение истории изменений для каждой заметки, возможность просмотра всех версий, сравнение версий, восстановление заметки к предыдущей версии.

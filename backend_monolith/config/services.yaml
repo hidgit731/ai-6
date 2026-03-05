@@ -27,3 +27,6 @@ services:
 
     App\Domain\Repository\TagRepositoryInterface:
         class: App\Infrastructure\Persistence\Repository\DoctrineTagRepository
+
+    App\Domain\Repository\NoteLinkRepositoryInterface:
+        class: App\Infrastructure\Persistence\Repository\DoctrineNoteLinkRepository
