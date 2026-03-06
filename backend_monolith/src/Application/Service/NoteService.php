@@ -243,6 +243,11 @@ class NoteService
         return $this->noteRepository->deleteExpiredTrash(new \DateTimeImmutable('now - 30 days'));
     }
 
+    public function emptyAllTrash(): int
+    {
+        return $this->noteRepository->deleteAllTrash();
+    }
+
     private function toResponse(Note $note): NoteResponse
     {
         return new NoteResponse(

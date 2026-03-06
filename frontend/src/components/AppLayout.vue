@@ -9,10 +9,7 @@ import SearchBar from './SearchBar.vue'
   <div class="app-layout">
     <header class="app-layout__header">
       <div class="app-layout__header-inner">
-        <span class="app-layout__logo">Заметки</span>
         <SearchBar />
-        <RouterLink to="/graph" class="app-layout__graph-link">Граф</RouterLink>
-        <RouterLink to="/dashboard" class="app-layout__graph-link">Дашборд</RouterLink>
       </div>
     </header>
 
@@ -56,38 +53,11 @@ import SearchBar from './SearchBar.vue'
   }
 
   &__header-inner {
-    max-width: var(--content-max-width);
-    margin: 0 auto;
     padding: 0 var(--content-padding-x);
     height: 100%;
     display: flex;
     align-items: center;
-  }
-
-  &__logo {
-    font-size: var(--font-size-lg);
-    font-weight: 600;
-    color: var(--color-primary);
-  }
-
-  &__graph-link {
-    margin-left: auto;
-    padding: 0.35rem 0.9rem;
-    border: 1px solid var(--color-border, #ddd);
-    border-radius: 4px;
-    font-size: var(--font-size-sm, 0.875rem);
-    color: var(--color-text, #444);
-    text-decoration: none;
-    white-space: nowrap;
-
-    &:hover {
-      background: var(--color-surface-hover, #f5f5f5);
-    }
-
-    &.router-link-active {
-      border-color: var(--color-primary, #4a90d9);
-      color: var(--color-primary, #4a90d9);
-    }
+    justify-content: center;
   }
 
   &__body {
@@ -109,8 +79,6 @@ import SearchBar from './SearchBar.vue'
   }
 
   &__content {
-    max-width: var(--content-max-width);
-    margin: 0 auto;
     padding: var(--spacing-lg) var(--content-padding-x);
     min-width: 0;
 

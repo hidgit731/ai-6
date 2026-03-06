@@ -190,6 +190,15 @@ class DoctrineNoteRepository implements NoteRepositoryInterface
         return ['items' => $items, 'total' => $total, 'pages' => $pages, 'page' => $page, 'limit' => $limit];
     }
 
+    public function deleteAllTrash(): int
+    {
+        return (int) $this->entityManager->createQueryBuilder()
+            ->delete(Note::class, 'n')
+            ->where('n.deletedAt IS NOT NULL')
+            ->getQuery()
+            ->execute();
+    }
+
     public function deleteExpiredTrash(\DateTimeImmutable $before): int
     {
         $qb = $this->entityManager->createQueryBuilder()
@@ -200,7 +209,7 @@ class DoctrineNoteRepository implements NoteRepositoryInterface
             ->setParameter('before', $before)
             ->setParameter('grace_period', new \DateTimeImmutable('now - 5 seconds'));
 
-        return $qb->getQuery()->executeStatement();
+        return (int) $qb->getQuery()->execute();
     }
 
     public function findByTitle(string $title): ?Note

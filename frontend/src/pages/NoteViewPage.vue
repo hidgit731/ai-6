@@ -6,11 +6,13 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import NoteLinksPanel from '@/components/NoteLinksPanel.vue'
 import { useNotesStore } from '@/stores/notes'
 import { useNoteLinksStore } from '@/stores/noteLinks'
+import { useExport } from '@/composables/useExport'
 
 const route = useRoute()
 const router = useRouter()
 const notesStore = useNotesStore()
 const noteLinksStore = useNoteLinksStore()
+const { downloadMarkdown, downloadPdf, isPdfLoading, pdfError } = useExport()
 
 const showDeleteDialog = ref(false)
 const deleteError = ref<string | null>(null)
@@ -81,6 +83,22 @@ async function handleDelete(): Promise<void> {
                     ← Назад
                 </button>
                 <div class="header-actions">
+                    <button
+                        class="btn-export"
+                        type="button"
+                        @click="downloadMarkdown(notesStore.currentNote!.id)"
+                    >
+                        Скачать .md
+                    </button>
+                    <button
+                        class="btn-export btn-export--pdf"
+                        type="button"
+                        :disabled="isPdfLoading"
+                        @click="downloadPdf(notesStore.currentNote!.id)"
+                    >
+                        {{ isPdfLoading ? 'Генерация...' : 'Скачать PDF' }}
+                    </button>
+                    <span v-if="pdfError" class="export-error">{{ pdfError }}</span>
                     <button
                         class="btn-edit"
                         @click="router.push({ name: 'note-edit', params: { id: notesStore.currentNote!.id } })"
@@ -179,6 +197,39 @@ async function handleDelete(): Promise<void> {
 .header-actions {
     display: flex;
     gap: 0.5rem;
+}
+
+.btn-export {
+    background: #6c757d;
+    color: white;
+    border: none;
+    padding: 0.45rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.btn-export:hover:not(:disabled) {
+    background: #5a6268;
+}
+
+.btn-export--pdf {
+    background: #dc3545;
+}
+
+.btn-export--pdf:hover:not(:disabled) {
+    background: #c82333;
+}
+
+.btn-export:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.export-error {
+    color: #dc3545;
+    font-size: 0.8rem;
+    align-self: center;
 }
 
 .btn-edit {

@@ -40,6 +40,7 @@ PHP 8.4: Follow standard conventions
 TypeScript 5.9 / Node.js 20+: Follow standard conventions; strict mode; `<script setup lang="ts">`
 
 ## Recent Changes
+- 012-ui-improvements: Added PHP 8.4 (backend), TypeScript 5.9 / Node.js 20 LTS (frontend) + Symfony 8.0, Doctrine ORM 3.6 + DBAL (backend); Vue 3.5, Pinia 3.0, Vue Router 5.0 (frontend)
 - 011-export-dashboard: Added PHP 8.4 (backend), TypeScript 5.9 / Node.js 20 LTS (frontend) + Symfony 8.0, Doctrine ORM 3.6 + DBAL (backend); Vue 3.5, Pinia 3.0, Vue Router 5.0 (frontend)
 
 <!-- MANUAL ADDITIONS START -->

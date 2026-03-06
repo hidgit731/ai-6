@@ -169,6 +169,12 @@ export function useNotes() {
         return res.json()
     }
 
+    async function emptyTrash(): Promise<{ deleted: number }> {
+        const res = await fetch(`${API_BASE}/notes/trash`, { method: 'DELETE' })
+        if (!res.ok) throw new Error('Ошибка очистки корзины')
+        return res.json()
+    }
+
     return {
         list,
         getById,
@@ -182,5 +188,6 @@ export function useNotes() {
         restore,
         getFavorites,
         getTrash,
+        emptyTrash,
     }
 }

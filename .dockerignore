@@ -1,0 +1,27 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Node.js (frontend)
+node_modules/
+*.log
+
+# PHP (backend)
+.phpunit.result.cache
+.env
+.env.local
+
+# Development
+.editorconfig
+
+# Project-specific
+specs/
+.claude/

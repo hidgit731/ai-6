@@ -132,6 +132,24 @@ function handleSelectFolder(folderId: string): void {
 
         <button class="folder-tree__create" @click="handleCreateFolder">+ Создать папку</button>
 
+        <ul class="folder-tree__list">
+            <li class="folder-tree__separator" />
+            <li
+                class="folder-tree__all"
+                :class="{ 'folder-tree__all--active': router.currentRoute.value.name === 'knowledge-graph' }"
+                @click="foldersStore.selectFolder(null); router.push({ name: 'knowledge-graph' })"
+            >
+                🕸️ Карта связей
+            </li>
+            <li
+                class="folder-tree__all"
+                :class="{ 'folder-tree__all--active': router.currentRoute.value.name === 'dashboard' }"
+                @click="foldersStore.selectFolder(null); router.push({ name: 'dashboard' })"
+            >
+                📊 Дашборд
+            </li>
+        </ul>
+
         <FolderContextMenu
             v-if="contextMenuFolderId"
             :folder-id="contextMenuFolderId"

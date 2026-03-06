@@ -164,6 +164,56 @@ GitHub Actions запускает при каждом Pull Request:
 
 ## Changelog
 
+### [012] UI Improvements & Layout Cleanup — 2026-03-10
+
+Улучшения пользовательского интерфейса: очистка макета, реорганизация навигации, исправление отображения облака тегов, перенос кнопок экспорта, добавление массового удаления корзины.
+
+**Frontend — изменено:**
+
+- **`src/components/AppLayout.vue`**:
+  - убраны ссылки на «Граф знаний» и «Дашборд» из шапки (перенесены в сайдбар).
+  - поиск теперь центрирован в шапке.
+  - убран логотип/название из шапки (упрощение заголовка).
+  - снят `max-width` с основного контейнера — макет растягивается на полную ширину экрана.
+- **`src/components/FolderTree.vue`**:
+  - добавлены навигационные ссылки «Граф знаний» (`/graph`) и «Дашборд» (`/dashboard`) в нижнюю часть дерева папок.
+- **`src/pages/NotesListPage.vue`**:
+  - облако тегов вынесено в правую колонку (десктоп) / аккордеон (мобильный).
+  - снят `max-width` с контейнера страницы.
+  - **Исправлена ошибка**: облако тегов не отображалось из-за конфликта стилей `<details>` с UA stylesheet (Chrome 131+ использует `::details-content`). Решение: управление состоянием `open` через Vue `ref` (`isTagsOpen`) + `@toggle` событие вместо CSS-хаков `display: block/none` на дочерних элементах.
+  - на десктопе аккордеон открыт по умолчанию (`window.innerWidth >= 768` в `onMounted`), `<summary>` скрыт.
+  - убрана кнопка удаления из карточки заметки (дублировала действие в меню).
+- **`src/pages/NoteViewPage.vue`**:
+  - добавлены кнопки «Скачать .md» и «Скачать PDF» (перенесены со страницы редактирования).
+  - кнопки используют composable `useExport` (`downloadMarkdown`, `downloadPdf`, `isPdfLoading`, `pdfError`).
+- **`src/pages/NoteEditPage.vue`**:
+  - удалены кнопки экспорта (перенесены на страницу просмотра `NoteViewPage`).
+- **`src/pages/TrashPage.vue`**:
+  - добавлена кнопка «Очистить корзину» с подтверждением через `confirm()`.
+  - вызывает `notesStore.emptyTrash()` → `DELETE /api/notes/trash`.
+- **`src/stores/notes.ts`** (Pinia):
+  - добавлен метод `emptyTrash()` — вызывает `useNotes().emptyTrash()`, затем перезагружает список корзины.
+- **`src/composables/useNotes.ts`**:
+  - добавлена функция `emptyTrash()` — `DELETE /api/notes/trash`.
+
+**Backend — добавлено:**
+
+- **`src/Presentation/HTTP/EmptyTrashAction`** — `DELETE /api/notes/trash` (priority: 1):
+  - вызывает `NoteService::emptyAllTrash()`, возвращает `204 No Content`.
+- **`src/Application/Service/NoteService`** — добавлен метод `emptyAllTrash()`:
+  - делегирует в `NoteRepositoryInterface::deleteAllTrash()`.
+- **`src/Domain/Repository/NoteRepositoryInterface`** — добавлен контракт `deleteAllTrash(): void`.
+- **`src/Infrastructure/Persistence/Repository/DoctrineNoteRepository`** — добавлена реализация `deleteAllTrash()`:
+  - DQL bulk DELETE: `DELETE FROM Note n WHERE n.deletedAt IS NOT NULL`.
+
+**API — новые эндпоинты:**
+
+| Метод    | Путь               | Действие                                                            |
+|----------|--------------------|---------------------------------------------------------------------|
+| `DELETE` | `/api/notes/trash` | Массовое постоянное удаление всех заметок из корзины (priority: 1) |
+
+---
+
 ### [011] Export Dashboard & File Export — 2026-03-09
 
 Реализована информационная панель со статистикой и функцией экспорта заметок: отображение ключевых метрик (количество заметок, тегов, папок), визуализация активности создания заметок за последние 30 дней, экспорт заметок в форматы Markdown и PDF.

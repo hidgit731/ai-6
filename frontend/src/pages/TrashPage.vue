@@ -1,9 +1,20 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useNotesStore } from '@/stores/notes'
 import type { NoteListItem } from '@/composables/useNotes'
 
 const notesStore = useNotesStore()
+const bulkDeleteError = ref<string | null>(null)
+
+async function handleEmptyTrash(): Promise<void> {
+    if (!confirm('Все заметки из корзины будут удалены безвозвратно. Продолжить?')) return
+    bulkDeleteError.value = null
+    try {
+        await notesStore.emptyAllTrash()
+    } catch (e) {
+        bulkDeleteError.value = e instanceof Error ? e.message : 'Ошибка очистки корзины'
+    }
+}
 
 onMounted(async () => {
     await notesStore.fetchTrash(1)
@@ -55,8 +66,19 @@ function formatDate(isoDate: string | undefined): string {
 
 <template>
     <div class="trash-page">
-        <h1>Корзина</h1>
+        <div class="trash-page__header">
+            <h1>Корзина</h1>
+            <button
+                v-if="notesStore.trashTotal > 0"
+                class="trash-item__btn trash-item__btn--delete btn-empty-trash"
+                :disabled="notesStore.isEmptyingTrash"
+                @click="handleEmptyTrash"
+            >
+                {{ notesStore.isEmptyingTrash ? 'Удаление...' : 'Удалить все записи навсегда' }}
+            </button>
+        </div>
         <p v-if="notesStore.error" class="error-message">{{ notesStore.error }}</p>
+        <p v-if="bulkDeleteError" class="error-message">{{ bulkDeleteError }}</p>
 
         <div v-if="notesStore.trash.length === 0" class="empty-state">
             <p>Корзина пуста</p>
@@ -106,10 +128,28 @@ function formatDate(isoDate: string | undefined): string {
     padding: 2rem;
 }
 
-h1 {
-    margin: 0 0 2rem 0;
+.trash-page__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.trash-page__header h1 {
+    margin: 0;
     color: #222;
     font-size: 1.5rem;
+}
+
+.btn-empty-trash {
+    white-space: nowrap;
+}
+
+.btn-empty-trash:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 .error-message {

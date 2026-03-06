@@ -22,6 +22,7 @@ export const useNotesStore = defineStore('notes', () => {
     const trash = ref<NoteListItem[]>([])
     const trashPage = ref(1)
     const trashTotal = ref(0)
+    const isEmptyingTrash = ref(false)
     const loading = ref(false)
     const error = ref<string | null>(null)
     const lastError = ref<string | null>(null)
@@ -259,6 +260,21 @@ export const useNotesStore = defineStore('notes', () => {
         }
     }
 
+    async function emptyAllTrash(): Promise<void> {
+        isEmptyingTrash.value = true
+        try {
+            await notesApi.emptyTrash()
+            trash.value = []
+            trashTotal.value = 0
+            trashPage.value = 1
+        } catch (e) {
+            error.value = e instanceof Error ? e.message : 'Ошибка очистки корзины'
+            throw e
+        } finally {
+            isEmptyingTrash.value = false
+        }
+    }
+
     return {
         notes,
         currentNote,
@@ -269,6 +285,7 @@ export const useNotesStore = defineStore('notes', () => {
         trash,
         trashPage,
         trashTotal,
+        isEmptyingTrash,
         loading,
         error,
         lastError,
@@ -285,5 +302,6 @@ export const useNotesStore = defineStore('notes', () => {
         restoreNote,
         fetchFavorites,
         fetchTrash,
+        emptyAllTrash,
     }
 })

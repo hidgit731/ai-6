@@ -49,6 +49,8 @@ interface NoteRepositoryInterface
 
     public function deleteExpiredTrash(\DateTimeImmutable $before): int;
 
+    public function deleteAllTrash(): int;
+
     public function findByTitle(string $title): ?Note;
 
     /**
