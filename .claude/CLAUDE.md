@@ -1,50 +1,5 @@
 # Проект "Заметки"
 
-@../.specify/memory/constitution.md
-
----
-
-# Development Guidelines
-
-Auto-generated from all feature plans. Last updated: 2026-03-01
-
-## Active Technologies
-- PHP 8.4 (backend), TypeScript 5.9 / Node.js 20 LTS (frontend) + Symfony 8.0, Doctrine ORM 3.6 + DBAL (backend); Vue 3.5, Pinia 3.0, Vue Router 5.0 (frontend) (011-export-dashboard)
-- PostgreSQL 18.1 (no new tables) (011-export-dashboard)
-
-## Project Structure
-
-```text
-backend_monolith/
-frontend/
-```
-
-## Commands
-```
-# Backend (backend_monolith/)
-# cd backend_monolith && composer install        — установка зависимостей
-# cd backend_monolith && php bin/console         — Symfony CLI
-# cd backend_monolith && php vendor/bin/phpunit  — запуск тестов
-# cd backend_monolith && php vendor/bin/php-cs-fixer fix  — форматирование кода
-
-# Frontend (frontend/)
-# cd frontend && npm run dev        — dev server
-# cd frontend && npm run build      — production build
-# cd frontend && npm run type-check — TypeScript check
-# cd frontend && npm test           — unit tests
-```
-
-## Code Style
-
-PHP 8.4: Follow standard conventions
-TypeScript 5.9 / Node.js 20+: Follow standard conventions; strict mode; `<script setup lang="ts">`
-
-## Recent Changes
-- 012-ui-improvements: Added PHP 8.4 (backend), TypeScript 5.9 / Node.js 20 LTS (frontend) + Symfony 8.0, Doctrine ORM 3.6 + DBAL (backend); Vue 3.5, Pinia 3.0, Vue Router 5.0 (frontend)
-- 011-export-dashboard: Added PHP 8.4 (backend), TypeScript 5.9 / Node.js 20 LTS (frontend) + Symfony 8.0, Doctrine ORM 3.6 + DBAL (backend); Vue 3.5, Pinia 3.0, Vue Router 5.0 (frontend)
-
-<!-- MANUAL ADDITIONS START -->
-
 Монорепозиторий: REST API на Symfony 8 + SPA на Vue 3. Все команды выполняются внутри Docker-контейнеров через `docker compose exec`.
 
 ## Команды
@@ -189,5 +144,3 @@ Unit-тесты используют `MockObject` для репозиторие�
 - PHP 8.4 + Symfony 8.0, Doctrine ORM 3.6 + DBAL (backend)
 - Vue 3.5, Pinia 3.0, Vue Router 5.0, TypeScript 5.9 (frontend)
 - PostgreSQL 18.1
-
-<!-- MANUAL ADDITIONS END -->
